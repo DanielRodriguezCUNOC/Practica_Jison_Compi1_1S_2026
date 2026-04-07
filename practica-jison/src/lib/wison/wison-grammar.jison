@@ -25,7 +25,6 @@ function registrarErrorSintactico(mensaje, lexema, linea, columna) {
         mensaje
     });
 }
-
 %}
 
 %lex
@@ -34,29 +33,33 @@ function registrarErrorSintactico(mensaje, lexema, linea, columna) {
 
 //* ignorar espacios en blanco
 \s+                   /* ignorar espacios en blanco */
+[\u200B\u200C\u200D\uFEFF\u00A0]+ /* ignorar caracteres invisibles y nbsp */
 "#".*                 /* ignorar comentarios de linea */
 "/**"[\s\S]*?"*/"     /* ignorar comentarios de bloque */
 
 //* palabras reservadas
 
-"Wison"[\s]*"?"         return 'INICIO_WISON';
-"?"[\s]*"Wison"         return 'FIN_WISON';
+"Wison"                 return 'WISON';
 
-"Lex"[\s]*"{"[\s]*":"   return 'INICIO_LEX';
-":"[\s]*"}"             return 'FIN_LEX';
+"Lex"                   return 'INICIO_LEX';
 
-"Syntax"[\s]*"{"[\s]*"{"[\s]*":" return 'INICIO_SYNTAX';
-":"[\s]*"}"[\s]*"}"    return 'FIN_SYNTAX';
+"Syntax"                return 'INICIO_SYNTAX';
 
 "Terminal"              return 'TERMINAL';
 "No_Terminal"           return 'NO_TERMINAL';
 "Initial_Sim"           return 'INITIAL_SIM';
 
-
 //* Simbolos
 
-"<"[\s]*"-"            return 'ASIG_LEX';
-"<"[\s]*"="            return 'ASIG_SYN';
+"_"                    return 'GUION_BAJO';
+"?"                     return 'QUESTION_UP';
+"¿"                    return 'QUESTION_DOWN';
+"{"                     return 'LLAVE_ABIERTA';
+":"                     return 'DOS_PUNTOS';
+"}"                     return 'LLAVE_CERRADA';
+"<"                    return 'MENOR';
+"-"                    return 'GUION';
+"="                     return 'ASIG_LEX';
 ";"                    return 'PUNTO_Y_COMA';
 
 //* Identificadores
@@ -66,7 +69,9 @@ function registrarErrorSintactico(mensaje, lexema, linea, columna) {
 
 //* Literales
 \'[^\\']*\'             { yytext = yytext.slice(1, -1); return 'CADENA';}
+\[a-zA-Z\]             return 'ALFANUMERICO';
 \[aA\-zZ\]             return 'ALFANUMERICO';
+\[A\-Z\]               return 'ALFANUMERICO';
 \[0\-9\]               return 'NUMERO';
 
 
@@ -74,7 +79,6 @@ function registrarErrorSintactico(mensaje, lexema, linea, columna) {
 
 "*"                    return 'ESTRELLA_KLEENE';
 "+"                    return 'CERRADURA_POSITIVA';
-"?"                    return 'CLAUSULA_CIERRE'; 
 "|"                    return 'ALTERNACION';
 "("                    return 'PARENTESIS_ABIERTO';
 ")"                    return 'PARENTESIS_CERRADO';
@@ -82,10 +86,13 @@ function registrarErrorSintactico(mensaje, lexema, linea, columna) {
 //* Fin de archivo
 
 <<EOF>>                return 'EOF';
-.                      { registrarErrorLexico(yytext, yylineno, yylloc.first_column); }
+.                      {
+                          if (yy && typeof yy.registrarErrorLexico === 'function') {
+                              yy.registrarErrorLexico(yytext, yylineno + 1, yylloc.first_column + 1);
+                          }
+                      }
 
 /lex
-
 
 /*
 * Analizador Sintactico
@@ -98,83 +105,78 @@ function registrarErrorSintactico(mensaje, lexema, linea, columna) {
 
 //* Produccion raiz
 programa_wison
-    : INICIO_WISON bloque_lex bloque_syntax FIN_WISON EOF
+    : inicio_wison bloque_lex bloque_syntax fin_wison EOF
     { $$ = { lex: $2, syntax: $3, errors: { lexical: erroresLexicos, syntactic: erroresSintacticos } }; return $$; }
-    | INICIO_WISON error FIN_WISON EOF
+    | error fin_wison EOF
     {
         registrarErrorSintactico(
-            'La estructura general del archivo es inválida.',
+            'La estructura del archivo es inválida.',
             yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
+            @1.first_line,
+            @1.first_column + 1
         );
-        yyerrok;
         $$ = { lex: null, syntax: null, errors: { lexical: erroresLexicos, syntactic: erroresSintacticos } };
     }
     ;
 
+inicio_wison
+    : WISON QUESTION_DOWN
+    ;
+
+fin_wison
+    : QUESTION_UP WISON
+    ;
+
 //* Bloque Lexico
 bloque_lex
-    : INICIO_LEX lista_declaraciones_lex FIN_LEX
+    : inicio_lex lista_declaraciones_lex fin_lex
     { $$ = { terminals: $2 }; }
-    | INICIO_LEX error FIN_LEX
+    | error fin_lex
     {
         registrarErrorSintactico(
             'El bloque léxico está incompleto o mal formado.',
             yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
+            @1.first_line,
+            @1.first_column + 1
         );
-        yyerrok;
         $$ = { terminals: [] };
     }
+    ;
+
+inicio_lex
+    : INICIO_LEX LLAVE_ABIERTA DOS_PUNTOS
+    ;
+
+fin_lex
+    : DOS_PUNTOS LLAVE_CERRADA
     ;
 
 //* lista de declaraciones lexicas
 lista_declaraciones_lex
     : lista_declaraciones_lex declaracion_terminal
     { $$ = $1.concat([$2]); }
-    | lista_declaraciones_lex error PUNTO_Y_COMA
-    {
-        registrarErrorSintactico(
-            'Declaración léxica inválida; se omitió hasta el próximo punto y coma.',
-            yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
-        );
-        yyerrok;
-        $$ = $1;
-    }
     | declaracion_terminal
     { $$ = [$1]; }
-    | error PUNTO_Y_COMA
-    {
-        registrarErrorSintactico(
-            'Declaración léxica inválida; se omitió hasta el próximo punto y coma.',
-            yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
-        );
-        yyerrok;
-        $$ = [];
-    }
     ;
 
 //* Declaracion de terminales
 declaracion_terminal
-    : TERMINAL ID_TERMINAL ASIG_LEX expresion_lexica PUNTO_Y_COMA
+    : TERMINAL ID_TERMINAL asig_lex expresion_lexica PUNTO_Y_COMA
     { $$ = { kind: 'terminal', id: $2, expr: $4 }; }
-    | TERMINAL error PUNTO_Y_COMA
+    | error PUNTO_Y_COMA
     {
         registrarErrorSintactico(
             'Declaración de terminal incompleta o mal formada.',
             yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
+            @1.first_line,
+            @1.first_column + 1
         );
-        yyerrok;
         $$ = { kind: 'terminal', id: null, expr: [] };
     }
+    ;
+
+asig_lex
+    : MENOR GUION
     ;
 
 //* Expresiones Lexicas
@@ -192,7 +194,7 @@ lista_elementos_lexicos
 
 elemento_lexico
     : unidad_lexica operador_unario
-    { $$ = { type: 'unary', value: $1, operator: $2 }; }
+    { $$ = { type: 'unario', value: $1, operator: $2 }; }
     | unidad_lexica
     { $$ = $1; }
     ;
@@ -202,7 +204,7 @@ operador_unario
     { $$ = '*'; }
     | CERRADURA_POSITIVA
     { $$ = '+'; }
-    | CLAUSULA_CIERRE
+    | QUESTION_UP
     { $$ = '?'; }
     ;
 
@@ -210,9 +212,9 @@ unidad_lexica
     : CADENA
     { $$ = { type: 'literal', value: $1 }; }
     | ALFANUMERICO
-    { $$ = { type: 'class', value: $1 }; }
+    { $$ = { type: 'alfanumerico', value: $1 }; }
     | NUMERO
-    { $$ = { type: 'class', value: $1 }; }
+    { $$ = { type: 'numero', value: $1 }; }
     | ID_TERMINAL
     { $$ = { type: 'terminal_ref', value: $1 }; }
     | PARENTESIS_ABIERTO lista_elementos_lexicos PARENTESIS_CERRADO
@@ -221,36 +223,32 @@ unidad_lexica
 
 //* Bloque Sintactico
 bloque_syntax
-    : INICIO_SYNTAX lista_no_terminales declaracion_inicial lista_producciones FIN_SYNTAX
+    : inicio_syntax lista_no_terminales declaracion_inicial lista_producciones fin_syntax
     { $$ = { nonTerminals: $2, startSymbol: $3, productions: $4 }; }
-    | INICIO_SYNTAX error FIN_SYNTAX
+    | error fin_syntax
     {
         registrarErrorSintactico(
             'El bloque sintáctico está incompleto o mal formado.',
             yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
+            @1.first_line,
+            @1.first_column + 1
         );
-        yyerrok;
         $$ = { nonTerminals: [], startSymbol: null, productions: [] };
     }
+    ;
+
+inicio_syntax
+    : INICIO_SYNTAX LLAVE_ABIERTA LLAVE_ABIERTA DOS_PUNTOS
+    ;
+
+fin_syntax
+    : DOS_PUNTOS LLAVE_CERRADA LLAVE_CERRADA
     ;
 
 //* Declaracion de no terminales
 lista_no_terminales
     : lista_no_terminales declaracion_no_terminal
     { $$ = $1.concat([$2]); }
-        | lista_no_terminales error PUNTO_Y_COMA
-        {
-		registrarErrorSintactico(
-			'Declaración de no terminal inválida; se omitió hasta el próximo punto y coma.',
-			yytext,
-			yylineno + 1,
-			yylloc.first_column + 1
-		);
-		yyerrok;
-		$$ = $1;
-        }
     | declaracion_no_terminal
     { $$ = [$1]; }
     ;
@@ -258,15 +256,14 @@ lista_no_terminales
 declaracion_no_terminal
     : NO_TERMINAL ID_NO_TERMINAL PUNTO_Y_COMA
     { $$ = $2; }
-    | NO_TERMINAL error PUNTO_Y_COMA
+    | error PUNTO_Y_COMA
     {
         registrarErrorSintactico(
             'Declaración de no terminal incompleta o mal formada.',
             yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
+            @1.first_line,
+            @1.first_column + 1
         );
-        yyerrok;
         $$ = null;
     }
     ;
@@ -280,10 +277,9 @@ declaracion_inicial
         registrarErrorSintactico(
             'Declaración del símbolo inicial incompleta o mal formada.',
             yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
+            @2.first_line,
+            @2.first_column + 1
         );
-        yyerrok;
         $$ = null;
     }
     ;
@@ -295,12 +291,11 @@ lista_producciones
         | lista_producciones error PUNTO_Y_COMA
         {
 		registrarErrorSintactico(
-			'Producción inválida; se omitió hasta el próximo punto y coma.',
+			'Producción inválida. Omitida hasta encontrar un punto y coma.',
 			yytext,
-			yylineno + 1,
-			yylloc.first_column + 1
+            @2.first_line,
+            @2.first_column + 1
 		);
-		yyerrok;
 		$$ = $1;
         }
     | regla_produccion
@@ -308,21 +303,25 @@ lista_producciones
     ;
 
 regla_produccion
-    : ID_NO_TERMINAL ASIG_SYN opciones_produccion PUNTO_Y_COMA
+    : ID_NO_TERMINAL asig_syn opciones_produccion PUNTO_Y_COMA
     { $$ = { lhs: $1, rhs: $3 }; }
+    | ID_NO_TERMINAL asig_syn PUNTO_Y_COMA
+    { $$ = { lhs: $1, rhs: [[]] }; }
     | ID_NO_TERMINAL error PUNTO_Y_COMA
     {
         registrarErrorSintactico(
             'Producción incompleta o mal formada.',
             yytext,
-            yylineno + 1,
-            yylloc.first_column + 1
+            @2.first_line,
+            @2.first_column + 1
         );
-        yyerrok;
         $$ = { lhs: $1, rhs: [] };
     }
     ;
 
+asig_syn
+    : MENOR ASIG_LEX
+    ;
 
 //* Regla de produccion
 
@@ -335,10 +334,9 @@ opciones_produccion
 		registrarErrorSintactico(
 			'Una alternativa de la producción está incompleta.',
 			yytext,
-			yylineno + 1,
-			yylloc.first_column + 1
+            @3.first_line,
+            @3.first_column + 1
 		);
-		yyerrok;
 		$$ = $1.concat([[]]);
         }
     | secuencia_simbolos
@@ -357,12 +355,7 @@ secuencia_simbolos
 
 simbolo
     : ID_TERMINAL
-    { $$ = { kind: 'T', value: $1 }; }
+    { $$ = { kind: 'idTerminal', value: $1 }; }
     | ID_NO_TERMINAL
-    { $$ = { kind: 'NT', value: $1 }; }
+    { $$ = { kind: 'idNonTerminal', value: $1 }; }
     ;
-
-
-
-
-
