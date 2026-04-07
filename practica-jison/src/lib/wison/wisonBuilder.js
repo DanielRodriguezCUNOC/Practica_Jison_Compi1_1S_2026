@@ -1,3 +1,4 @@
+
 const DEFAULT_ENDPOINTS = {
 	saveAnalyzer: '/api/analyzers',
 	getAnalyzer: (id) => `/api/analyzers/${encodeURIComponent(id)}`,
@@ -5,10 +6,12 @@ const DEFAULT_ENDPOINTS = {
 	compileAnalyzer: '/api/analyzers/compile'
 };
 
+// Determina si una URL ya viene completa con protocolo.
 function isAbsoluteUrl(value) {
 	return typeof value === 'string' && /^https?:\/\//i.test(value);
 }
 
+// Une la URL base con una ruta relativa sin duplicar diagonales.
 function joinUrl(baseUrl, path) {
 	if (!path) return baseUrl;
 	if (isAbsoluteUrl(path)) return path;
@@ -16,6 +19,7 @@ function joinUrl(baseUrl, path) {
 	return `${baseUrl.replace(/\/+$/, '')}/${String(path).replace(/^\/+/, '')}`;
 }
 
+// Permite que un endpoint sea un string fijo o una función generadora.
 function normalizeEndpoint(endpoint, ...args) {
 	if (typeof endpoint === 'function') {
 		return endpoint(...args);
@@ -24,6 +28,8 @@ function normalizeEndpoint(endpoint, ...args) {
 	return endpoint;
 }
 
+// Compila localmente la gramática si existe un compilador inyectado.
+// Si no se proporciona, intenta usar Jison dinámicamente.
 async function tryLocalCompile(grammarText, compiler) {
 	if (typeof compiler === 'function') {
 		return compiler(grammarText);
@@ -58,6 +64,8 @@ async function tryLocalCompile(grammarText, compiler) {
 	}
 }
 
+// Construye el artefacto final que puede almacenarse en RAM o persistirse.
+// Incluye la gramática original, la salida del compilador y metadatos.
 function buildAnalyzerArtifact(grammarText, compiledResult, metadata = {}) {
 	const parserSource =
 		typeof compiledResult === 'string'
@@ -81,6 +89,8 @@ function buildAnalyzerArtifact(grammarText, compiledResult, metadata = {}) {
 	};
 }
 
+// Builder principal de Wison.
+// Centraliza la compilación de gramáticas y la comunicación con la API.
 export class WisonBuilder {
 	constructor({
 		apiBaseUrl = '',
@@ -88,6 +98,7 @@ export class WisonBuilder {
 		endpoints = {},
 		compiler = null
 	} = {}) {
+		// Configuración de conexión y compilación inyectable.
 		this.apiBaseUrl = apiBaseUrl;
 		this.fetchImpl = fetchImpl;
 		this.compiler = compiler;
@@ -97,25 +108,7 @@ export class WisonBuilder {
 		};
 	}
 
-	setApiBaseUrl(apiBaseUrl) {
-		this.apiBaseUrl = apiBaseUrl ?? '';
-	}
-
-	setCompiler(compiler) {
-		this.compiler = compiler;
-	}
-
-	setFetch(fetchImpl) {
-		this.fetchImpl = fetchImpl;
-	}
-
-	setEndpoints(endpoints = {}) {
-		this.endpoints = {
-			...this.endpoints,
-			...endpoints
-		};
-	}
-
+	// Compila la gramática y devuelve el artefacto estructurado.
 	async compileGrammar(grammarText, options = {}) {
 		if (typeof grammarText !== 'string' || grammarText.trim().length === 0) {
 			throw new Error('La gramática de entrada debe ser un texto no vacío.');
@@ -125,6 +118,7 @@ export class WisonBuilder {
 		return buildAnalyzerArtifact(grammarText, compiledResult, options.metadata);
 	}
 
+	// Envía el artefacto del analizador a la API para su persistencia.
 	async saveAnalyzer(analyzerArtifact, options = {}) {
 		if (typeof this.fetchImpl !== 'function') {
 			throw new Error('No hay una implementación de fetch disponible para llamar a la API.');
@@ -154,6 +148,7 @@ export class WisonBuilder {
 		return response.json();
 	}
 
+	// Recupera un analizador previamente almacenado en la API.
 	async loadAnalyzer(analyzerId, options = {}) {
 		if (typeof this.fetchImpl !== 'function') {
 			throw new Error('No hay una implementación de fetch disponible para llamar a la API.');
@@ -182,6 +177,7 @@ export class WisonBuilder {
 		return response.json();
 	}
 
+	// Obtiene el catálogo de analizadores disponibles en la API.
 	async listAnalyzers(options = {}) {
 		if (typeof this.fetchImpl !== 'function') {
 			throw new Error('No hay una implementación de fetch disponible para llamar a la API.');
@@ -206,6 +202,7 @@ export class WisonBuilder {
 		return response.json();
 	}
 
+	// Flujo completo: compila la gramática y, si corresponde, la guarda en la API.
 	async buildAndSave(grammarText, options = {}) {
 		const analyzerArtifact = await this.compileGrammar(grammarText, options);
 		if (options.persist === false) {
@@ -215,6 +212,7 @@ export class WisonBuilder {
 		return this.saveAnalyzer(analyzerArtifact, options.api ?? options);
 	}
 
+	// Descarga un analizador y, si incluye la gramática fuente, lo recompila localmente.
 	async restoreAnalyzerFromApi(analyzerId, options = {}) {
 		const analyzerRecord = await this.loadAnalyzer(analyzerId, options.api ?? options);
 		const grammarText = analyzerRecord?.grammar?.source ?? analyzerRecord?.grammarText ?? '';
@@ -231,8 +229,10 @@ export class WisonBuilder {
 	}
 }
 
+// Factory helper para crear instancias sin usar directamente `new`.
 export function createWisonBuilder(config) {
 	return new WisonBuilder(config);
 }
 
+// Export por defecto para importaciones simples.
 export default WisonBuilder;
