@@ -31,12 +31,14 @@
   .error-list {
     display: grid;
     gap: 0.55rem;
-    max-height: 17rem;
+    min-height: 18rem;
+    max-height: 28rem;
     overflow: auto;
+    padding-right: 0.1rem;
   }
 
   article {
-    padding: 0.65rem;
+    padding: 0.8rem 0.85rem;
     border-radius: 0.72rem;
     border: 1px solid rgba(165, 36, 36, 0.26);
     background: rgba(255, 243, 242, 0.85);
@@ -50,13 +52,13 @@
   }
 
   strong {
-    font: 700 0.78rem/1 var(--font-mono);
+    font: 700 0.82rem/1 var(--font-mono);
     color: #6f1f1f;
   }
 
   span {
-    font: 600 0.69rem/1 var(--font-mono);
-    padding: 0.22rem 0.42rem;
+    font: 600 0.72rem/1 var(--font-mono);
+    padding: 0.24rem 0.48rem;
     border-radius: 999px;
     background: rgba(165, 36, 36, 0.12);
     color: #7f2a2a;
@@ -64,7 +66,7 @@
 
   p {
     margin: 0;
-    font: 500 0.8rem/1.35 var(--font-text);
+    font: 500 0.84rem/1.42 var(--font-text);
     color: #572626;
   }
 

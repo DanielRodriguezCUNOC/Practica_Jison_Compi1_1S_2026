@@ -26,27 +26,28 @@
 
 <style>
   .workspace {
-    max-width: 1220px;
+    width: min(100%, 1600px);
+    max-width: 1600px;
     margin: 0 auto;
-    padding: clamp(1rem, 2vw, 1.6rem);
+    padding: clamp(1rem, 2vw, 1.8rem);
     display: grid;
-    gap: 1rem;
+    gap: 1.15rem;
   }
 
   .workspace-grid {
     display: grid;
-    gap: 1rem;
+    gap: 1.15rem;
   }
 
   .stack {
     display: grid;
-    gap: 1rem;
+    gap: 1.15rem;
     align-content: start;
   }
 
   @media (min-width: 960px) {
     .workspace-grid {
-      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
     }
   }
 </style>
