@@ -1,8 +1,11 @@
 <script>
-	import Panel from '$lib/components/ui/Panel.svelte';
-	import { evaluarConfiguracionWison } from '$lib/services/jison-service';
-	import { limpiarErroresDelAnalizador, establecerErroresDelAnalizador } from '$lib/stores/error-store';
-	import { establecerEstadoDelAnalizador } from '$lib/stores/app-store';
+	import Panel from "$lib/components/ui/Panel.svelte";
+	import { evaluarConfiguracionWison } from "$lib/services/jison-service";
+	import {
+		limpiarErroresDelAnalizador,
+		establecerErroresDelAnalizador,
+	} from "$lib/stores/error-store";
+	import { establecerEstadoDelAnalizador } from "$lib/stores/app-store";
 
 	let sampleGrammar = $state(`Wison ?
 Lex {:
@@ -16,11 +19,30 @@ Initial_Sim %_E;
 :}}
 ? Wison`);
 	let isEvaluating = $state(false);
-	let feedback = $state('');
+	let feedback = $state("");
+	let areaEditor = $state();
+	let lineaEditor = $state();
+
+	function obtenerNumerosDeLinea(texto) {
+		const totalLineas = Math.max(1, texto.split("\n").length);
+		const numeros = [];
+
+		for (let i = 1; i <= totalLineas; i += 1) {
+			numeros.push(i);
+		}
+
+		return numeros;
+	}
+
+	function sincronizarNumerosDeLinea(event) {
+		if (lineaEditor) {
+			lineaEditor.scrollTop = event.currentTarget.scrollTop;
+		}
+	}
 
 	async function onEvaluateConfiguration() {
 		isEvaluating = true;
-		feedback = '';
+		feedback = "";
 		limpiarErroresDelAnalizador();
 
 		const resultado = await evaluarConfiguracionWison(sampleGrammar);
@@ -28,16 +50,16 @@ Initial_Sim %_E;
 
 		if (resultado.ok) {
 			establecerEstadoDelAnalizador({
-				status: 'success',
+				status: "success",
 				ast: resultado.ast,
-				message: 'Configuración válida.'
+				message: "Configuración válida.",
 			});
-			feedback = 'Configuración válida.';
+			feedback = "Configuración válida.";
 		} else {
 			establecerEstadoDelAnalizador({
-				status: 'error',
+				status: "error",
 				ast: resultado.ast,
-				message: `Se detectaron ${resultado.errores.length} error(es).`
+				message: `Se detectaron ${resultado.errores.length} error(es).`,
 			});
 			feedback = `Se detectaron ${resultado.errores.length} error(es).`;
 		}
@@ -56,16 +78,28 @@ Initial_Sim %_E;
 	}
 </script>
 
-<Panel title="Definicion del Analizador" subtitle="Escribe o carga una configuracion de gramatica" tone="accent">
+<Panel
+	title="Definicion del Analizador"
+	subtitle="Escribe o carga una configuracion de gramatica"
+	tone="accent"
+>
 	{#snippet actions()}
-		<button type="button" onclick={onEvaluateConfiguration} disabled={isEvaluating}>
-			{isEvaluating ? 'Evaluando...' : 'Evaluar Configuracion'}
+		<button
+			type="button"
+			onclick={onEvaluateConfiguration}
+			disabled={isEvaluating}
+		>
+			{isEvaluating ? "Evaluando..." : "Evaluar Configuracion"}
 		</button>
 	{/snippet}
 
 	<div class="toolbar">
 		<label class="file-upload">
-			<input type="file" accept=".wison,.txt,.jison" onchange={onFileSelected} />
+			<input
+				type="file"
+				accept=".wison,.txt,.jison"
+				onchange={onFileSelected}
+			/>
 			<span>Cargar archivo</span>
 		</label>
 		<span class="hint">Se admiten archivos .jison y .txt</span>
@@ -75,11 +109,61 @@ Initial_Sim %_E;
 		<p class="feedback">{feedback}</p>
 	{/if}
 
-	<label for="grammar-editor" class="editor-label">Editor de configuracion</label>
-	<textarea id="grammar-editor" rows="14" bind:value={sampleGrammar} spellcheck="false"></textarea>
+	<label for="grammar-editor" class="editor-label"
+		>Editor de configuracion</label
+	>
+	<div class="editor-shell">
+		<div class="line-numbers" bind:this={lineaEditor} aria-hidden="true">
+			{#each obtenerNumerosDeLinea(sampleGrammar) as numero}
+				<span>{numero}</span>
+			{/each}
+		</div>
+		<textarea
+			id="grammar-editor"
+			rows="18"
+			bind:this={areaEditor}
+			bind:value={sampleGrammar}
+			onscroll={sincronizarNumerosDeLinea}
+			spellcheck="false"
+		></textarea>
+	</div>
 </Panel>
 
 <style>
+	.editor-shell {
+		display: grid;
+		grid-template-columns: 3.75rem minmax(0, 1fr);
+		align-items: stretch;
+		border: 1px solid rgba(25, 41, 74, 0.2);
+		border-radius: 0.9rem;
+		overflow: hidden;
+		background: #111c35;
+		min-height: 31rem;
+	}
+
+	.line-numbers {
+		display: grid;
+		align-content: start;
+		padding: 0.9rem 0.5rem;
+		background: rgba(255, 255, 255, 0.05);
+		border-right: 1px solid rgba(255, 255, 255, 0.08);
+		color: rgba(239, 243, 255, 0.5);
+		font: 600 0.8rem/1.52 var(--font-mono);
+		text-align: right;
+		user-select: none;
+		overflow: auto;
+		scrollbar-width: none;
+	}
+
+	.line-numbers::-webkit-scrollbar {
+		display: none;
+	}
+
+	.line-numbers span {
+		display: block;
+		padding-right: 0.25rem;
+	}
+
 	.toolbar {
 		display: flex;
 		flex-wrap: wrap;
@@ -129,14 +213,22 @@ Initial_Sim %_E;
 
 	textarea {
 		width: 100%;
-		min-height: 18rem;
-		border-radius: 0.75rem;
-		border: 1px solid rgba(25, 41, 74, 0.2);
-		background: #111c35;
+		height: 100%;
+		min-height: 31rem;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
 		color: #eff3ff;
-		font: 500 0.83rem/1.5 var(--font-mono);
-		padding: 0.9rem;
+		font: 500 0.88rem/1.55 var(--font-mono);
+		padding: 0.9rem 1rem;
 		resize: vertical;
+		outline: none;
+		white-space: pre;
+		overflow: auto;
+	}
+
+	textarea::selection {
+		background: rgba(240, 163, 74, 0.35);
 	}
 
 	button {

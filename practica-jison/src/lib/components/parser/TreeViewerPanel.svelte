@@ -13,7 +13,9 @@
     aria-label="Arbol de derivacion de ejemplo"
   >
     {#if !$estadoDelAnalizador.ast}
-      <p class="empty">Aun no hay AST. Evalua una configuracion para verlo aqui.</p>
+      <p class="empty">
+        Aun no hay AST. Evalua una configuracion para verlo aqui.
+      </p>
     {:else}
       <pre>{JSON.stringify($estadoDelAnalizador.ast, null, 2)}</pre>
     {/if}
@@ -22,10 +24,11 @@
 
 <style>
   .tree-canvas {
-    padding: 0.4rem;
+    padding: 0.5rem;
     display: grid;
     gap: 0.42rem;
-    max-height: 22rem;
+    min-height: 20rem;
+    max-height: 32rem;
     overflow: auto;
   }
 
@@ -33,17 +36,18 @@
     margin: 0;
     white-space: pre-wrap;
     word-break: break-word;
-    border-radius: 0.55rem;
+    border-radius: 0.8rem;
     border: 1px solid rgba(25, 41, 74, 0.2);
     background: rgba(255, 255, 255, 0.78);
-    padding: 0.6rem;
-    font: 500 0.75rem/1.45 var(--font-mono);
+    padding: 0.9rem;
+    min-height: 18rem;
+    font: 500 0.82rem/1.5 var(--font-mono);
     color: var(--color-ink);
   }
 
   .empty {
     margin: 0;
-    font: 500 0.85rem/1.4 var(--font-text);
+    font: 500 0.9rem/1.45 var(--font-text);
     color: var(--color-ink-soft);
   }
 </style>
