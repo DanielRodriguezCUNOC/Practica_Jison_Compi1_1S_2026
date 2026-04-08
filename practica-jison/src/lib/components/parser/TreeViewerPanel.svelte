@@ -1,6 +1,6 @@
 <script>
   import Panel from "$lib/components/ui/Panel.svelte";
-  import { parserState } from "$lib/stores/app-store";
+  import { estadoDelAnalizador } from "$lib/stores/app-store";
 </script>
 
 <Panel
@@ -12,10 +12,10 @@
     role="img"
     aria-label="Arbol de derivacion de ejemplo"
   >
-    {#if !$parserState.ast}
+    {#if !$estadoDelAnalizador.ast}
       <p class="empty">Aun no hay AST. Evalua una configuracion para verlo aqui.</p>
     {:else}
-      <pre>{JSON.stringify($parserState.ast, null, 2)}</pre>
+      <pre>{JSON.stringify($estadoDelAnalizador.ast, null, 2)}</pre>
     {/if}
   </div>
 </Panel>

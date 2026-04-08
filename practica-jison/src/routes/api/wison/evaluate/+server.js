@@ -1,16 +1,19 @@
 import { json } from '@sveltejs/kit';
 import wisonGrammarSource from '$lib/wison/wison-grammar.jison?raw';
+import { validarSemanticaWison } from '$lib/wison/semantic-validator';
+import { calcularPrimeroSiguiente } from '$lib/wison/first-follow';
+import { construirTablaLl1, formatearTablaParseo, formatearConflictos } from '$lib/wison/ll1-table-builder';
 
-function toErrorItem(type, detail, line = null, column = null) {
-	const position = line != null && column != null ? ` (L${line}, C${column})` : '';
+function crearElementoError(tipo, detalle, linea = null, columna = null) {
+	const posicion = linea != null && columna != null ? ` (L${linea}, C${columna})` : '';
 	return {
-		type,
+		type: tipo,
 		scope: 'Configuracion',
-		detail: `${detail}${position}`
+		detail: `${detalle}${posicion}`
 	};
 }
 
-function getParserFactory(jisonModule) {
+function obtenerFabricaParser(jisonModule) {
 	const Jison = jisonModule?.default ?? jisonModule;
 	const parserFactory = Jison?.Parser ?? Jison?.Generator ?? Jison;
 
@@ -21,10 +24,10 @@ function getParserFactory(jisonModule) {
 	return parserFactory;
 }
 
-function mapStructuredErrors(errors = [], label) {
-	return errors.map((item) =>
-		toErrorItem(
-			label,
+function mapearErroresEstructurados(errores = [], etiqueta) {
+	return errores.map((item) =>
+		crearElementoError(
+			etiqueta,
 			item?.mensaje ?? 'Error no especificado.',
 			item?.linea ?? null,
 			item?.columna ?? null
@@ -32,58 +35,58 @@ function mapStructuredErrors(errors = [], label) {
 	);
 }
 
-function mapThrownParserError(error) {
-	const rawMessage = String(error?.message ?? 'Error de analisis no controlado.');
-	if (/is not defined/i.test(rawMessage)) {
-		return toErrorItem(
+function mapearErrorLanzadoParser(error) {
+	const mensajeCrudo = String(error?.message ?? 'Error de analisis no controlado.');
+	if (/is not defined/i.test(mensajeCrudo)) {
+		return crearElementoError(
 			'Infraestructura',
-			`Error interno del evaluador de Wison. No es un error de tu archivo. Detalle tecnico: ${rawMessage}`
+			`Error interno del evaluador de Wison. No es un error de tu archivo. Detalle tecnico: ${mensajeCrudo}`
 		);
 	}
 
-	const fromHashLine = error?.hash?.loc?.first_line ?? null;
-	const fromHashColumn = error?.hash?.loc?.first_column ?? null;
+	const lineaDesdeHash = error?.hash?.loc?.first_line ?? null;
+	const columnaDesdeHash = error?.hash?.loc?.first_column ?? null;
 
-	if (fromHashLine != null && fromHashColumn != null) {
-		return toErrorItem('Sintactico', rawMessage, fromHashLine, fromHashColumn + 1);
+	if (lineaDesdeHash != null && columnaDesdeHash != null) {
+		return crearElementoError('Sintactico', mensajeCrudo, lineaDesdeHash, columnaDesdeHash + 1);
 	}
 
-	const stackMatch = String(error?.stack ?? '').match(/:(\d+):(\d+)\)?(?:\n|$)/);
-	const stackLine = stackMatch ? Number(stackMatch[1]) : null;
-	const stackColumn = stackMatch ? Number(stackMatch[2]) : null;
+	const coincidenciaPila = String(error?.stack ?? '').match(/:(\d+):(\d+)\)?(?:\n|$)/);
+	const lineaPila = coincidenciaPila ? Number(coincidenciaPila[1]) : null;
+	const columnaPila = coincidenciaPila ? Number(coincidenciaPila[2]) : null;
 
-	return toErrorItem('Sintactico', rawMessage, stackLine, stackColumn);
+	return crearElementoError('Sintactico', mensajeCrudo, lineaPila, columnaPila);
 }
 
 export async function POST({ request }) {
-	let payload;
+	let datosSolicitud;
 	try {
-		payload = await request.json();
+		datosSolicitud = await request.json();
 	} catch {
 		return json(
 			{
 				ok: false,
 				ast: null,
-				errors: [toErrorItem('Validacion', 'El cuerpo de la solicitud no es JSON valido.')]
+				errores: [crearElementoError('Validacion', 'El cuerpo de la solicitud no es JSON valido.')]
 			},
 			{ status: 400 }
 		);
 	}
 
-	const sourceText = payload?.sourceText;
-	if (typeof sourceText !== 'string' || sourceText.trim().length === 0) {
+	const textoFuente = datosSolicitud?.textoFuente;
+	if (typeof textoFuente !== 'string' || textoFuente.trim().length === 0) {
 		return json({
 			ok: false,
 			ast: null,
-			errors: [toErrorItem('Validacion', 'La configuracion esta vacia.')]
+			errores: [crearElementoError('Validacion', 'La configuracion esta vacia.')]
 		});
 	}
 
 	let parser;
 	try {
 		const jisonModule = await import('jison');
-		const parserFactory = getParserFactory(jisonModule);
-		parser = new parserFactory(wisonGrammarSource);
+		const fabricaParser = obtenerFabricaParser(jisonModule);
+		parser = new fabricaParser(wisonGrammarSource);
 		parser.yy = {
 			erroresLexicos: [],
 			registrarErrorLexico(lexema, linea, columna) {
@@ -101,8 +104,8 @@ export async function POST({ request }) {
 			{
 				ok: false,
 				ast: null,
-				errors: [
-					toErrorItem(
+				errores: [
+					crearElementoError(
 						'Infraestructura',
 						`No se pudo inicializar Jison en servidor. Detalle: ${error.message}`
 					)
@@ -113,23 +116,40 @@ export async function POST({ request }) {
 	}
 
 	try {
-		const ast = parser.parse(sourceText);
-		const lexicalErrorsFromAst = mapStructuredErrors(ast?.errors?.lexical, 'Lexico');
-		const lexicalErrorsFromLexer = mapStructuredErrors(parser?.yy?.erroresLexicos, 'Lexico');
-		const lexicalErrors = lexicalErrorsFromAst.concat(lexicalErrorsFromLexer);
-		const syntacticErrors = mapStructuredErrors(ast?.errors?.syntactic, 'Sintactico');
-		const errors = lexicalErrors.concat(syntacticErrors);
+		const ast = parser.parse(textoFuente);
+		const erroresLexicosDelAst = mapearErroresEstructurados(ast?.errors?.lexical, 'Lexico');
+		const erroresLexicosDelLexer = mapearErroresEstructurados(parser?.yy?.erroresLexicos, 'Lexico');
+		const erroresLexicos = erroresLexicosDelAst.concat(erroresLexicosDelLexer);
+		const erroresSintacticos = mapearErroresEstructurados(ast?.errors?.syntactic, 'Sintactico');
+		const validacionSemantica = validarSemanticaWison(ast);
+		const erroresSemanticos = mapearErroresEstructurados(validacionSemantica?.errores, 'Semantico');
+		const errores = erroresLexicos.concat(erroresSintacticos, erroresSemanticos);
+
+		let conjuntosPrimeroSiguiente = null;
+		let tablaLl1 = null;
+		let conflictosLl1 = null;
+		if (errores.length === 0) {
+			conjuntosPrimeroSiguiente = calcularPrimeroSiguiente(ast);
+			const resultadoTabla = construirTablaLl1(ast, conjuntosPrimeroSiguiente);
+			tablaLl1 = formatearTablaParseo(resultadoTabla.tabla);
+			if (resultadoTabla.conflictos.length > 0) {
+				conflictosLl1 = formatearConflictos(resultadoTabla.conflictos);
+			}
+		}
 
 		return json({
-			ok: errors.length === 0,
+			ok: errores.length === 0,
 			ast,
-			errors
+			errores,
+			conjuntosPrimeroSiguiente,
+			tablaLl1,
+			conflictosLl1
 		});
 	} catch (error) {
 		return json({
 			ok: false,
 			ast: null,
-			errors: [mapThrownParserError(error)]
+			errores: [mapearErrorLanzadoParser(error)]
 		});
 	}
 }

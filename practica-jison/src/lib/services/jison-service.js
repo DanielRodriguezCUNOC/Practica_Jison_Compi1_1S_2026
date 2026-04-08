@@ -1,18 +1,18 @@
-function toErrorItem(type, detail, line = null, column = null) {
-	const position = line != null && column != null ? ` (L${line}, C${column})` : '';
+function crearElementoError(tipo, detalle, linea = null, columna = null) {
+	const posicion = linea != null && columna != null ? ` (L${linea}, C${columna})` : '';
 	return {
-		type,
+		type: tipo,
 		scope: 'Configuracion',
-		detail: `${detail}${position}`
+		detail: `${detalle}${posicion}`
 	};
 }
 
-export async function evaluateWisonConfiguration(sourceText) {
-	if (typeof sourceText !== 'string' || sourceText.trim().length === 0) {
+export async function evaluarConfiguracionWison(textoFuente) {
+	if (typeof textoFuente !== 'string' || textoFuente.trim().length === 0) {
 		return {
 			ok: false,
 			ast: null,
-			errors: [toErrorItem('Validacion', 'La configuración está vacía.')]
+			errores: [crearElementoError('Validacion', 'La configuración está vacía.')]
 		};
 	}
 
@@ -22,7 +22,7 @@ export async function evaluateWisonConfiguration(sourceText) {
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify({ sourceText })
+			body: JSON.stringify({ textoFuente })
 		});
 
 		const data = await response.json();
@@ -30,21 +30,21 @@ export async function evaluateWisonConfiguration(sourceText) {
 			return {
 				ok: false,
 				ast: null,
-				errors: data?.errors ?? [toErrorItem('Infraestructura', 'Fallo la evaluacion en servidor.')]
+				errores: data?.errores ?? [crearElementoError('Infraestructura', 'Fallo la evaluacion en servidor.')]
 			};
 		}
 
 		return {
 			ok: Boolean(data?.ok),
 			ast: data?.ast ?? null,
-			errors: Array.isArray(data?.errors) ? data.errors : []
+			errores: Array.isArray(data?.errores) ? data.errores : []
 		};
 	} catch (error) {
 		return {
 			ok: false,
 			ast: null,
-			errors: [
-				toErrorItem(
+			errores: [
+				crearElementoError(
 					'Infraestructura',
 					`No se pudo completar la evaluacion de la configuracion. Detalle tecnico: ${error.message}`
 				)

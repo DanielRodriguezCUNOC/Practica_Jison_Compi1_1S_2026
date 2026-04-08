@@ -1,8 +1,8 @@
 <script>
 	import Panel from '$lib/components/ui/Panel.svelte';
-	import { evaluateWisonConfiguration } from '$lib/services/jison-service';
-	import { clearParserErrors, setParserErrors } from '$lib/stores/error-store';
-	import { setParserState } from '$lib/stores/app-store';
+	import { evaluarConfiguracionWison } from '$lib/services/jison-service';
+	import { limpiarErroresDelAnalizador, establecerErroresDelAnalizador } from '$lib/stores/error-store';
+	import { establecerEstadoDelAnalizador } from '$lib/stores/app-store';
 
 	let sampleGrammar = $state(`Wison ?
 Lex {:
@@ -21,25 +21,25 @@ Initial_Sim %_E;
 	async function onEvaluateConfiguration() {
 		isEvaluating = true;
 		feedback = '';
-		clearParserErrors();
+		limpiarErroresDelAnalizador();
 
-		const result = await evaluateWisonConfiguration(sampleGrammar);
-		setParserErrors(result.errors);
+		const resultado = await evaluarConfiguracionWison(sampleGrammar);
+		establecerErroresDelAnalizador(resultado.errores);
 
-		if (result.ok) {
-			setParserState({
+		if (resultado.ok) {
+			establecerEstadoDelAnalizador({
 				status: 'success',
-				ast: result.ast,
+				ast: resultado.ast,
 				message: 'Configuración válida.'
 			});
 			feedback = 'Configuración válida.';
 		} else {
-			setParserState({
+			establecerEstadoDelAnalizador({
 				status: 'error',
-				ast: result.ast,
-				message: `Se detectaron ${result.errors.length} error(es).`
+				ast: resultado.ast,
+				message: `Se detectaron ${resultado.errores.length} error(es).`
 			});
-			feedback = `Se detectaron ${result.errors.length} error(es).`;
+			feedback = `Se detectaron ${resultado.errores.length} error(es).`;
 		}
 
 		isEvaluating = false;

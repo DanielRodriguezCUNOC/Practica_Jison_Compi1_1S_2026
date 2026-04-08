@@ -1,20 +1,20 @@
 import { writable } from 'svelte/store';
 
-const INITIAL_STATE = {
+const ESTADO_INICIAL = {
 	status: 'idle',
 	ast: null,
 	message: ''
 };
 
-export const parserState = writable(INITIAL_STATE);
+export const estadoDelAnalizador = writable(ESTADO_INICIAL);
 
-export function setParserState(nextState) {
-	parserState.set({
-		...INITIAL_STATE,
-		...nextState
+export function establecerEstadoDelAnalizador(nuevoEstado) {
+	estadoDelAnalizador.set({
+		...ESTADO_INICIAL,
+		...nuevoEstado
 	});
 }
 
-export function resetParserState() {
-	parserState.set(INITIAL_STATE);
+export function restablecerEstadoDelAnalizador() {
+	estadoDelAnalizador.set(ESTADO_INICIAL);
 }

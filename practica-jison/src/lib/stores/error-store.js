@@ -1,11 +1,11 @@
 import { writable } from 'svelte/store';
 
-export const parserErrors = writable([]);
+export const erroresDelAnalizador = writable([]);
 
-export function setParserErrors(errors = []) {
-	parserErrors.set(errors);
+export function establecerErroresDelAnalizador(errores = []) {
+	erroresDelAnalizador.set(errores);
 }
 
-export function clearParserErrors() {
-	parserErrors.set([]);
+export function limpiarErroresDelAnalizador() {
+	erroresDelAnalizador.set([]);
 }

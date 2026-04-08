@@ -1,6 +1,6 @@
 <script>
   import Panel from "$lib/components/ui/Panel.svelte";
-  import { parserErrors } from "$lib/stores/error-store";
+  import { erroresDelAnalizador } from "$lib/stores/error-store";
 </script>
 
 <Panel
@@ -9,12 +9,12 @@
   tone="alert"
 >
   <div class="error-list" role="log" aria-live="polite">
-    {#if $parserErrors.length === 0}
+    {#if $erroresDelAnalizador.length === 0}
       <article class="empty">
         <p>No hay errores para mostrar.</p>
       </article>
     {:else}
-      {#each $parserErrors as item}
+      {#each $erroresDelAnalizador as item}
         <article>
           <header>
             <strong>{item.type}</strong>
