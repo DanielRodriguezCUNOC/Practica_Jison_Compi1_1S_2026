@@ -1,40 +1,79 @@
 <script>
 	import Panel from '$lib/components/ui/Panel.svelte';
+	import { evaluarConfiguracionWison } from '$lib/services/jison-service';
+	import { limpiarErroresDelAnalizador, establecerErroresDelAnalizador } from '$lib/stores/error-store';
+	import { establecerEstadoDelAnalizador } from '$lib/stores/app-store';
 
-	let sampleGrammar = $state(`%token NUM PLUS MINUS TIMES DIV LPAREN RPAREN
-%start Exp
+	let sampleGrammar = $state(`Wison ?
+Lex {:
+Terminal $_ID <- 'id';
+Terminal $_PLUS <- '+';
+:}
+Syntax {{:
+No_Terminal %_E;
+Initial_Sim %_E;
+%_E <= $_ID | $_ID $_PLUS $_ID;
+:}}
+? Wison`);
+	let isEvaluating = $state(false);
+	let feedback = $state('');
 
-%%
-Exp
-  : Exp PLUS Term
-  | Exp MINUS Term
-  | Term
-  ;
+	async function onEvaluateConfiguration() {
+		isEvaluating = true;
+		feedback = '';
+		limpiarErroresDelAnalizador();
 
-Term
-  : Term TIMES Factor
-  | Term DIV Factor
-  | Factor
-  ;
+		const resultado = await evaluarConfiguracionWison(sampleGrammar);
+		establecerErroresDelAnalizador(resultado.errores);
 
-Factor
-  : NUM
-  | LPAREN Exp RPAREN
-	;`);
+		if (resultado.ok) {
+			establecerEstadoDelAnalizador({
+				status: 'success',
+				ast: resultado.ast,
+				message: 'Configuración válida.'
+			});
+			feedback = 'Configuración válida.';
+		} else {
+			establecerEstadoDelAnalizador({
+				status: 'error',
+				ast: resultado.ast,
+				message: `Se detectaron ${resultado.errores.length} error(es).`
+			});
+			feedback = `Se detectaron ${resultado.errores.length} error(es).`;
+		}
+
+		isEvaluating = false;
+	}
+
+	async function onFileSelected(event) {
+		const input = event.currentTarget;
+		const file = input?.files?.[0];
+		if (!file) return;
+
+		const fileContent = await file.text();
+		sampleGrammar = fileContent;
+		feedback = `Archivo cargado: ${file.name}`;
+	}
 </script>
 
 <Panel title="Definicion del Analizador" subtitle="Escribe o carga una configuracion de gramatica" tone="accent">
 	{#snippet actions()}
-		<button type="button">Evaluar Configuracion</button>
+		<button type="button" onclick={onEvaluateConfiguration} disabled={isEvaluating}>
+			{isEvaluating ? 'Evaluando...' : 'Evaluar Configuracion'}
+		</button>
 	{/snippet}
 
 	<div class="toolbar">
 		<label class="file-upload">
-			<input type="file" accept=".jison,.txt" />
+			<input type="file" accept=".wison,.txt,.jison" onchange={onFileSelected} />
 			<span>Cargar archivo</span>
 		</label>
 		<span class="hint">Se admiten archivos .jison y .txt</span>
 	</div>
+
+	{#if feedback}
+		<p class="feedback">{feedback}</p>
+	{/if}
 
 	<label for="grammar-editor" class="editor-label">Editor de configuracion</label>
 	<textarea id="grammar-editor" rows="14" bind:value={sampleGrammar} spellcheck="false"></textarea>
@@ -74,6 +113,12 @@ Factor
 		color: var(--color-ink-soft);
 	}
 
+	.feedback {
+		margin: 0 0 0.7rem;
+		font: 600 0.78rem/1.35 var(--font-text);
+		color: var(--color-ink);
+	}
+
 	.editor-label {
 		display: block;
 		margin-bottom: 0.42rem;
@@ -103,5 +148,10 @@ Factor
 		background: var(--color-accent);
 		color: #231207;
 		cursor: pointer;
+	}
+
+	button:disabled {
+		opacity: 0.65;
+		cursor: not-allowed;
 	}
 </style>

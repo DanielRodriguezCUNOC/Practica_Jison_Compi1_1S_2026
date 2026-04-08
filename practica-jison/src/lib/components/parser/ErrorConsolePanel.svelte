@@ -1,23 +1,6 @@
 <script>
   import Panel from "$lib/components/ui/Panel.svelte";
-
-  const errors = [
-    {
-      type: "Sintactico",
-      scope: "Construccion",
-      detail: "Produccion Exp -> Exp + Term genera recursion izquierda.",
-    },
-    {
-      type: "Semantico",
-      scope: "Construccion",
-      detail: "No terminal Factor definido pero no alcanzable.",
-    },
-    {
-      type: "Lexico",
-      scope: "Prueba",
-      detail: 'Token "@" no reconocido en la posicion 14.',
-    },
-  ];
+  import { erroresDelAnalizador } from "$lib/stores/error-store";
 </script>
 
 <Panel
@@ -25,17 +8,22 @@
   subtitle="Lexicos, sintacticos y semanticos"
   tone="alert"
 >
-  <!-- * Aqui se mostraran errores cuando el analizador funciones jsjsjs  -->
   <div class="error-list" role="log" aria-live="polite">
-    {#each errors as item}
-      <article>
-        <header>
-          <strong>{item.type}</strong>
-          <span>{item.scope}</span>
-        </header>
-        <p>{item.detail}</p>
+    {#if $erroresDelAnalizador.length === 0}
+      <article class="empty">
+        <p>No hay errores para mostrar.</p>
       </article>
-    {/each}
+    {:else}
+      {#each $erroresDelAnalizador as item}
+        <article>
+          <header>
+            <strong>{item.type}</strong>
+            <span>{item.scope}</span>
+          </header>
+          <p>{item.detail}</p>
+        </article>
+      {/each}
+    {/if}
   </div>
 </Panel>
 
@@ -78,5 +66,14 @@
     margin: 0;
     font: 500 0.8rem/1.35 var(--font-text);
     color: #572626;
+  }
+
+  .empty {
+    border-color: rgba(25, 41, 74, 0.2);
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  .empty p {
+    color: var(--color-ink-soft);
   }
 </style>
