@@ -2,8 +2,7 @@
 const PUNTOS_FINALES_POR_DEFECTO = {
 	guardarAnalizador: '/api/analyzers',
 	obtenerAnalizador: (id) => `/api/analyzers/${encodeURIComponent(id)}`,
-	listarAnalizadores: '/api/analyzers',
-	compilarAnalizador: '/api/analyzers/compile'
+	listarAnalizadores: '/api/analyzers'
 };
 
 // Determina si una URL ya viene completa con protocolo.

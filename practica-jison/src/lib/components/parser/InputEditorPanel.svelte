@@ -1,8 +1,15 @@
 <script>
   import Panel from "$lib/components/ui/Panel.svelte";
+  import { estadoDelAnalizador, establecerEstadoDelAnalizador } from "$lib/stores/app-store";
+  import { establecerErroresDelAnalizador } from "$lib/stores/error-store";
+  import { tokenizadorBasico } from "$lib/services/lexer-basico";
+  import { ejecutarParserGenerado } from "$lib/services/parser-api";
+  import { get } from "svelte/store";
 
   let inputText = $state("12 + 8 * (7 - 4)");
   let lineaEntrada = $state();
+  let feedbackAnalisis = $state("");
+  let analizando = $state(false);
 
   function obtenerNumerosDeLinea(texto) {
     const totalLineas = Math.max(1, texto.split("\n").length);
@@ -20,6 +27,46 @@
       lineaEntrada.scrollTop = event.currentTarget.scrollTop;
     }
   }
+
+  // Ejecuta el parser con la entrada del usuario.
+  function onAnalizarEntrada() {
+    // Inicia modo de analisis.
+    analizando = true;
+    feedbackAnalisis = "";
+    establecerErroresDelAnalizador([]);
+
+    // Obtiene el estado actual del store de forma segura.
+    const estadoActual = get(estadoDelAnalizador);
+
+    // Verifica que exista un parser inyectado.
+    if (!estadoActual || !estadoActual.parserGeneradoInstancia) {
+      feedbackAnalisis = "Primero debes evaluar y generar un analizador.";
+      analizando = false;
+      return;
+    }
+
+    // Tokeniza la entrada usando divisor simple.
+    const tokens = tokenizadorBasico(inputText);
+
+    // Ejecuta el parser con los tokens.
+    const resultado = ejecutarParserGenerado(estadoActual.parserGeneradoInstancia, tokens);
+
+    // Guarda el resultado en el store para que otros paneles lo vean.
+    establecerEstadoDelAnalizador({
+      resultadoAnalisisEntrada: resultado
+    });
+
+    // Muestra resultado de analisis.
+    if (resultado.ok && resultado.errores.length === 0) {
+      feedbackAnalisis = "Analisis exitoso.";
+    } else {
+      feedbackAnalisis = `Analisis con ${resultado.errores.length} error(es).`;
+      establecerErroresDelAnalizador(resultado.errores);
+    }
+
+    // Finaliza modo de analisis.
+    analizando = false;
+  }
 </script>
 
 <Panel
@@ -27,8 +74,14 @@
   subtitle="Ingresa la entrada para el analizador seleccionado"
 >
   {#snippet actions()}
-    <button type="button">Analizar Entrada</button>
+    <button type="button" onclick={onAnalizarEntrada} disabled={analizando}>
+      {analizando ? "Analizando..." : "Analizar Entrada"}
+    </button>
   {/snippet}
+
+  {#if feedbackAnalisis}
+    <p class="feedback">{feedbackAnalisis}</p>
+  {/if}
 
   <label for="input-editor">Editor de entrada</label>
   <div class="editor-shell">
@@ -113,5 +166,16 @@
     background: #2f9c76;
     color: #082116;
     cursor: pointer;
+  }
+
+  button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  .feedback {
+    margin: 0 0 0.7rem;
+    font: 600 0.78rem/1.35 var(--font-text);
+    color: var(--color-ink);
   }
 </style>

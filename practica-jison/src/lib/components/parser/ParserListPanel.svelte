@@ -1,22 +1,86 @@
 <script>
+  import { onMount } from 'svelte';
   import Panel from "$lib/components/ui/Panel.svelte";
+  import { listarAnalizadoresApi, obtenerAnalizadorApi } from '$lib/services/api-client';
+  import { establecerEstadoDelAnalizador } from '$lib/stores/app-store';
 
-  //* Datos de ejemplo para ilustrar la funcionalidad
-  const parsers = [
-    { id: "arith_ll1", name: "Aritmetica Basica", status: "LISTO" },
-    { id: "json_subset", name: "JSON Subconjunto", status: "LISTO" },
-    { id: "if_else", name: "Sentencias IF/ELSE", status: "REVISION" },
-  ];
+  let parsers = $state([]);
+  let selectedId = $state(null);
+  let cargandoLista = $state(false);
+  let cargandoItem = $state(false);
+  let mensaje = $state('');
 
-  let selectedId = $state(parsers[0].id);
+  async function onRecargarLista() {
+    cargandoLista = true;
+    mensaje = '';
+    try {
+      const items = await listarAnalizadoresApi();
+      parsers = items.map((item) => ({
+        id: item.id,
+        name: item.nombre,
+        status: 'GUARDADO',
+        fechaCreacion: item.fechaCreacion
+      }));
+
+      if (parsers.length > 0 && selectedId == null) {
+        selectedId = parsers[0].id;
+      }
+
+      if (parsers.length === 0) {
+        mensaje = 'No hay analizadores guardados.';
+      }
+    } catch (error) {
+      mensaje = `Error al listar: ${error.message}`;
+    } finally {
+      cargandoLista = false;
+    }
+  }
+
+  async function onCargarSeleccionado() {
+    if (selectedId == null) {
+      mensaje = 'Selecciona un analizador de la lista.';
+      return;
+    }
+
+    cargandoItem = true;
+    mensaje = '';
+    try {
+      const data = await obtenerAnalizadorApi(selectedId);
+      establecerEstadoDelAnalizador({
+        analizadorSeleccionadoId: data?.id ?? selectedId,
+        analizadorSeleccionadoNombre: data?.nombre ?? '',
+        wisonFuenteSeleccionada: data?.wisonSource ?? ''
+      });
+      mensaje = `Analizador cargado: ${data?.nombre ?? selectedId}`;
+    } catch (error) {
+      mensaje = `Error al cargar: ${error.message}`;
+    } finally {
+      cargandoItem = false;
+    }
+  }
+
+  onMount(() => {
+    onRecargarLista();
+  });
 </script>
 
-<!-- * Aqui se mostrarian los analizadores disponibles haciendo un request a
-        la API XD -->
 <Panel
   title="Analizadores Disponibles"
   subtitle="Selecciona uno para probar cadenas de entrada"
 >
+  {#snippet actions()}
+    <button type="button" onclick={onRecargarLista} disabled={cargandoLista}>
+      {cargandoLista ? 'Recargando...' : 'Recargar'}
+    </button>
+    <button type="button" onclick={onCargarSeleccionado} disabled={cargandoItem || selectedId == null}>
+      {cargandoItem ? 'Cargando...' : 'Cargar al Editor'}
+    </button>
+  {/snippet}
+
+  {#if mensaje}
+    <p class="mensaje">{mensaje}</p>
+  {/if}
+
   <ul>
     {#each parsers as parser}
       <li class:selected={selectedId === parser.id}>
@@ -68,5 +132,11 @@
     border-radius: 999px;
     background: rgba(18, 36, 69, 0.12);
     color: #1e3160;
+  }
+
+  .mensaje {
+    margin: 0 0 0.6rem;
+    font: 600 0.78rem/1.35 var(--font-text);
+    color: var(--color-ink);
   }
 </style>
