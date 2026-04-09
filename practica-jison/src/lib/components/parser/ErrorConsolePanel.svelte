@@ -1,6 +1,34 @@
 <script>
   import Panel from "$lib/components/ui/Panel.svelte";
   import { erroresDelAnalizador } from "$lib/stores/error-store";
+
+  function obtenerTipoDeError(item) {
+    if (item && item.type != null) return item.type;
+    if (item && item.tipo != null) return item.tipo;
+    return "Error";
+  }
+  function obtenerScope(item) {
+    if (item && item.scope != null) return item.scope;
+    return "Parser";
+  }
+
+  function obtenerDetalle(item) {
+    if (item && item.detail != null) return item.detail;
+    if (item && item.mensaje != null) return item.mensaje;
+    return "Sin detalle";
+  }
+
+  function obtenerFila(item) {
+    if (item && item.line != null) return item.line;
+    if (item && item.fila != null) return item.fila;
+    return null;
+  }
+
+  function obtenerColumna(item) {
+    if (item && item.column != null) return item.column;
+    if (item && item.columna != null) return item.columna;
+    return null;
+  }
 </script>
 
 <Panel
@@ -17,10 +45,17 @@
       {#each $erroresDelAnalizador as item}
         <article>
           <header>
-            <strong>{item.type}</strong>
-            <span>{item.scope}</span>
+            <strong>{obtenerTipoDeError(item)}</strong>
+            <span>{obtenerScope(item)}</span>
           </header>
-          <p>{item.detail}</p>
+          <p>{obtenerDetalle(item)}</p>
+          {#if obtenerFila(item) !== null && obtenerColumna(item) !== null}
+            <p>
+              <strong>Línea:</strong>
+              {obtenerFila(item)}, <strong>Columna:</strong>
+              {obtenerColumna(item)}
+            </p>
+          {/if}
         </article>
       {/each}
     {/if}
