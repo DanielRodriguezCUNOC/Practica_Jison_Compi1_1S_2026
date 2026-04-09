@@ -1,15 +1,11 @@
 <script>
-	import { onMount } from 'svelte';
 	import Panel from "$lib/components/ui/Panel.svelte";
 	import { evaluarConfiguracionWison } from "$lib/services/jison-service";
-	import { guardarAnalizadorApi } from '$lib/services/api-client';
 	import {
 		limpiarErroresDelAnalizador,
 		establecerErroresDelAnalizador,
 	} from "$lib/stores/error-store";
-	import { estadoDelAnalizador, establecerEstadoDelAnalizador } from "$lib/stores/app-store";
-	import { generarParserDescendente } from "$lib/wison/recursive-descent-generator";
-	import { inyectarParserEnCaliente } from "$lib/services/parser-api";
+	import { establecerEstadoDelAnalizador } from "$lib/stores/app-store";
 
 	let sampleGrammar = $state(`Wison ?
 Lex {:
@@ -23,7 +19,6 @@ Initial_Sim %_E;
 :}}
 ? Wison`);
 	let isEvaluating = $state(false);
-	let isSaving = $state(false);
 	let feedback = $state("");
 	let areaEditor = $state();
 	let lineaEditor = $state();
@@ -45,130 +40,30 @@ Initial_Sim %_E;
 		}
 	}
 
-	onMount(() => {
-		const cancelar = estadoDelAnalizador.subscribe((estadoActual) => {
-			const fuenteRemota = estadoActual?.wisonFuenteSeleccionada;
-			if (typeof fuenteRemota === 'string' && fuenteRemota.length > 0 && fuenteRemota !== sampleGrammar) {
-				sampleGrammar = fuenteRemota;
-				const nombre = estadoActual?.analizadorSeleccionadoNombre || 'sin nombre';
-				feedback = `Analizador cargado desde API: ${nombre}`;
-			}
-		});
-
-		return () => {
-			cancelar();
-		};
-	});
-
-	async function onGuardarAnalizador() {
-		if (typeof sampleGrammar !== 'string' || sampleGrammar.trim().length === 0) {
-			feedback = 'No puedes guardar una configuracion vacia.';
-			return;
-		}
-
-		const nombreIngresado = prompt('Nombre del analizador:');
-		if (!nombreIngresado || nombreIngresado.trim().length === 0) {
-			feedback = 'Guardado cancelado: nombre vacio.';
-			return;
-		}
-
-		isSaving = true;
-		try {
-			const respuesta = await guardarAnalizadorApi(nombreIngresado.trim(), sampleGrammar);
-			establecerEstadoDelAnalizador({
-				analizadorSeleccionadoId: respuesta?.id ?? null,
-				analizadorSeleccionadoNombre: nombreIngresado.trim()
-			});
-			feedback = respuesta?.mensaje ?? 'Analizador guardado correctamente.';
-		} catch (error) {
-			feedback = `Error al guardar: ${error.message}`;
-		} finally {
-			isSaving = false;
-		}
-	}
-
 	async function onEvaluateConfiguration() {
-		// Activa modo de evaluacion en UI.
 		isEvaluating = true;
 		feedback = "";
 		limpiarErroresDelAnalizador();
 
-		// Llama al backend para validar la configuracion completa.
 		const resultado = await evaluarConfiguracionWison(sampleGrammar);
 		establecerErroresDelAnalizador(resultado.errores);
 
-		// Evalua si hay conflictos en la tabla LL(1).
-		let hayConflictosLl1 = false;
-		if (Array.isArray(resultado.conflictosLl1) && resultado.conflictosLl1.length > 0) {
-			hayConflictosLl1 = true;
-		}
-
-		if (resultado.ok && !hayConflictosLl1) {
-			// Intenta generar e inyectar el parser.
-			try {
-				// Genera el codigo Typescript/JavaScript del parser.
-				const codigoParserFuente = generarParserDescendente(
-					resultado.ast,
-					resultado.tablaLl1
-				);
-				
-				// Inyecta el parser en caliente.
-				const instanciaParser = inyectarParserEnCaliente(codigoParserFuente);
-				
-				// Guarda estado exitoso con el parser inyectado.
-				establecerEstadoDelAnalizador({
-					status: "success",
-					ast: resultado.ast,
-					message: "Configuracion valida, parser generado e inyectado.",
-					conjuntosPrimeroSiguiente: resultado.conjuntosPrimeroSiguiente,
-					tablaLl1: resultado.tablaLl1,
-					conflictosLl1: resultado.conflictosLl1,
-					parserGeneradoFuente: codigoParserFuente,
-					parserGeneradoInstancia: instanciaParser
-				});
-				feedback = "Parser generado e inyectado exitosamente.";
-			} catch (error) {
-				// Error durante generacion o inyeccion del parser.
-				establecerEstadoDelAnalizador({
-					status: "error",
-					ast: resultado.ast,
-					message: `Error al generar parser: ${error.message}`,
-					conjuntosPrimeroSiguiente: resultado.conjuntosPrimeroSiguiente,
-					tablaLl1: resultado.tablaLl1,
-					conflictosLl1: resultado.conflictosLl1,
-				});
-				feedback = `Error: ${error.message}`;
-				establecerErroresDelAnalizador([{
-					type: 'Infraestructura',
-					scope: 'ParserGenerador',
-					detail: error.message
-				}]);
-			}
-		} else if (resultado.ok && hayConflictosLl1) {
-			// Guarda estado de error funcional cuando la gramatica no es LL(1).
+		if (resultado.ok) {
 			establecerEstadoDelAnalizador({
-				status: "error",
+				status: "success",
 				ast: resultado.ast,
-				message: `La gramatica tiene ${resultado.conflictosLl1.length} conflicto(s) LL(1).`,
-				conjuntosPrimeroSiguiente: resultado.conjuntosPrimeroSiguiente,
-				tablaLl1: resultado.tablaLl1,
-				conflictosLl1: resultado.conflictosLl1,
+				message: "Configuración válida.",
 			});
-			feedback = `Gramatica no LL(1): ${resultado.conflictosLl1.length} conflicto(s).`;
+			feedback = "Configuración válida.";
 		} else {
-			// Guarda errores de validacion/parseo de la configuracion.
 			establecerEstadoDelAnalizador({
 				status: "error",
 				ast: resultado.ast,
 				message: `Se detectaron ${resultado.errores.length} error(es).`,
-				conjuntosPrimeroSiguiente: resultado.conjuntosPrimeroSiguiente,
-				tablaLl1: resultado.tablaLl1,
-				conflictosLl1: resultado.conflictosLl1,
 			});
 			feedback = `Se detectaron ${resultado.errores.length} error(es).`;
 		}
 
-		// Desactiva modo de evaluacion al finalizar.
 		isEvaluating = false;
 	}
 
@@ -189,13 +84,6 @@ Initial_Sim %_E;
 	tone="accent"
 >
 	{#snippet actions()}
-		<button
-			type="button"
-			onclick={onGuardarAnalizador}
-			disabled={isSaving}
-		>
-			{isSaving ? 'Guardando...' : 'Guardar Analizador'}
-		</button>
 		<button
 			type="button"
 			onclick={onEvaluateConfiguration}
