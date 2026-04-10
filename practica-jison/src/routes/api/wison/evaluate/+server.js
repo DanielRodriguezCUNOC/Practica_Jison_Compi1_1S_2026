@@ -40,7 +40,7 @@ function mapearErrorLanzadoParser(error) {
 	const mensajeCrudo = String(error?.message ?? 'Error de analisis no controlado.');
 	if (/is not defined/i.test(mensajeCrudo)) {
 		return crearElementoError(
-			'Infraestructura',
+			'Estructura',
 			`Error interno del evaluador de Wison. No es un error de tu archivo. Detalle tecnico: ${mensajeCrudo}`
 		);
 	}
@@ -75,6 +75,7 @@ export async function POST({ request }) {
 	}
 
 	const textoFuente = datosSolicitud?.textoFuente;
+	const modo = datosSolicitud?.modo === 'compilar' ? 'compilar' : 'evaluar';
 	if (typeof textoFuente !== 'string' || textoFuente.trim().length === 0) {
 		return json({
 			ok: false,
@@ -84,8 +85,9 @@ export async function POST({ request }) {
 	}
 
 	let parser;
+	let jisonModule;
 	try {
-		const jisonModule = await import('jison');
+		jisonModule = await import('jison');
 		const fabricaParser = obtenerFabricaParser(jisonModule);
 		parser = new fabricaParser(wisonGrammarSource);
 		parser.yy = {
@@ -107,7 +109,7 @@ export async function POST({ request }) {
 				ast: null,
 				errores: [
 					crearElementoError(
-						'Infraestructura',
+						'Estructura',
 						`No se pudo inicializar Jison en servidor. Detalle: ${error.message}`
 					)
 				]
@@ -131,7 +133,7 @@ export async function POST({ request }) {
 		let conflictosLl1 = null;
 		let parserObjetivoGramatica = '';
 		let parserObjetivoFuente = '';
-		if (errores.length === 0) {
+		if (errores.length === 0 && modo === 'compilar') {
 			conjuntosPrimeroSiguiente = calcularPrimeroSiguiente(ast);
 			const resultadoTabla = construirTablaLl1(ast, conjuntosPrimeroSiguiente);
 			tablaLl1 = formatearTablaParseo(resultadoTabla.tabla);

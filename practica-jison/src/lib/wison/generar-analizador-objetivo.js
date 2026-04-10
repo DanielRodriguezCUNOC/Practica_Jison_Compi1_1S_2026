@@ -33,7 +33,7 @@ class GeneradorAnalizadorObjetivo {
 		return partes.join('\n');
 	}
 
-	// Obtiene el simbolo inicial mapeado a NT_.
+	// Obtiene el simbolo inicial mapeado a NT_ (recordamos que NT representa no terminales jeje).
 	obtenerSimboloInicialMapeado() {
 		const simboloInicialOriginal = this.ast?.syntax?.startSymbol;
 		const simboloInicial = this.mapaNoTerminales[simboloInicialOriginal];
@@ -44,7 +44,7 @@ class GeneradorAnalizadorObjetivo {
 		return simboloInicial;
 	}
 
-	// Arma todas las partes del archivo .jison final.
+	// Arma todas las partes del archivo .jison.
 	construirPartesDeGramatica(simboloInicial, reglasLex, reglasSintacticas) {
 		const partes = [];
 		partes.push('%lex');
@@ -59,8 +59,6 @@ class GeneradorAnalizadorObjetivo {
 
 		return partes;
 	}
-
-
 
 	// Escapa texto para usarlo en acciones JS del parser.
 	escaparParaTextoPlano(valor) {
@@ -83,7 +81,7 @@ class GeneradorAnalizadorObjetivo {
 		return resultado;
 	}
 
-	// Escapa metacaracteres para construir reglas regex.
+	// Escapa metacaracteres para construir reglas regex. 
 	escaparParaRegex(valor) {
 		if (typeof valor !== 'string') {
 			return '';
@@ -102,7 +100,7 @@ class GeneradorAnalizadorObjetivo {
 		return resultado;
 	}
 
-	// Normaliza las clases especiales definidas en Wison.
+	// Normaliza las clases especiales definidas en Wison. Esto permite que clases como [a-zA-Z] o [0-9] se conviertan a formas compatibles con Jison y se eviten caracteres no soportados en regex. Si la clase no es reconocida, se devuelve una clase genérica que acepta cualquier caracter alfanumerico o guion bajo para evitar errores de regex invalidos.
 	normalizarClase(valorOriginal) {
 		if (typeof valorOriginal !== 'string') {
 			return '[A-Za-z0-9_]';
@@ -122,6 +120,7 @@ class GeneradorAnalizadorObjetivo {
 		const texto = String(nombre ?? '');
 
 		for (let i = 0; i < texto.length; i += 1) {
+      // Solo se permiten letras, digitos o guion bajo. El resto se reemplaza por guion bajo para evitar caracteres invalidos en nombres de tokens y no terminales.
 			const caracter = texto.charAt(i);
 			const esLetra = (caracter >= 'a' && caracter <= 'z') || (caracter >= 'A' && caracter <= 'Z');
 			const esDigito = caracter >= '0' && caracter <= '9';
@@ -153,6 +152,7 @@ class GeneradorAnalizadorObjetivo {
 		for (let i = 0; i < terminales.length; i += 1) {
 			const terminal = terminales[i];
 			if (!terminal?.id) continue;
+
       // Aqui van los terminales
 			this.mapaTerminales[terminal.id] = `TOK_${this.normalizarIdentificador(terminal.id, 'T', i)}`;
 		}
@@ -160,6 +160,7 @@ class GeneradorAnalizadorObjetivo {
 		for (let i = 0; i < noTerminales.length; i += 1) {
 			const noTerminal = noTerminales[i];
 			if (!noTerminal) continue;
+
       // Aqui van los no terminales
 			this.mapaNoTerminales[noTerminal] = `NT_${this.normalizarIdentificador(noTerminal, 'N', i)}`;
 		}
@@ -189,8 +190,6 @@ class GeneradorAnalizadorObjetivo {
 
 		throw new Error(`Tipo de elemento lexico no soportado: ${elemento.type}`);
 	}
-
-
 
 	// Identifica si el elemento es literal.
 	esElementoLiteral(elemento) {
@@ -369,7 +368,7 @@ class GeneradorAnalizadorObjetivo {
 		return `${lhs}\n\t: ${lineasAlternativas.join('\n\t| ')}\n\t;`;
 	}
 
-	// Convierte alternativas a lineas jison sin acciones semanticas.
+	// Convierte alternativas a lineas jison.
 	construirLineasAlternativas(lhsOriginal, alternativas) {
 		const lineas = [];
 		const lista = Array.isArray(alternativas) ? alternativas : [];

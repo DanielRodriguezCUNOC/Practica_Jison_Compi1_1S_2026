@@ -1,6 +1,6 @@
 <script>
 	import Panel from "$lib/components/ui/Panel.svelte";
-	import { compilarAnalizadorWison } from "$lib/services/jison-service";
+	import { evaluarConfiguracionWison } from "$lib/services/jison-service";
 	import { guardarAnalizadorApi } from "$lib/services/api-client";
 	import {
 		limpiarErroresDelAnalizador,
@@ -52,25 +52,30 @@ Initial_Sim %_E;
 		feedback = "";
 		limpiarErroresDelAnalizador();
 
-		const resultado = await compilarAnalizadorWison(sampleGrammar);
+		const resultado = await evaluarConfiguracionWison(sampleGrammar);
 		establecerErroresDelAnalizador(resultado.errores);
 
 		if (resultado.ok) {
 			establecerEstadoDelAnalizador({
 				status: "success",
 				ast: resultado.ast,
-				conjuntosPrimeroSiguiente: resultado.conjuntosPrimeroSiguiente,
-				tablaLl1: resultado.tablaLl1,
-				conflictosLl1: resultado.conflictosLl1,
-				parserGeneradoFuente: resultado.parserGeneradoFuente,
-				parserGeneradoInstancia: resultado.parserGeneradoInstancia,
+				conjuntosPrimeroSiguiente: null,
+				tablaLl1: null,
+				conflictosLl1: null,
+				parserGeneradoFuente: "",
+				parserGeneradoInstancia: null,
 				message: "Configuración válida.",
 			});
-			feedback = "Configuración válida y analizador listo.";
+			feedback = "Configuración válida.";
 		} else {
 			establecerEstadoDelAnalizador({
 				status: "error",
 				ast: resultado.ast,
+				conjuntosPrimeroSiguiente: null,
+				tablaLl1: null,
+				conflictosLl1: null,
+				parserGeneradoFuente: "",
+				parserGeneradoInstancia: null,
 				message: `Se detectaron ${resultado.errores.length} error(es).`,
 			});
 			feedback = `Se detectaron ${resultado.errores.length} error(es).`;

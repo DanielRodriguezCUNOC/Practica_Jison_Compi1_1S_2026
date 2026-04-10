@@ -9,7 +9,9 @@ function crearElementoError(tipo, detalle, linea = null, columna = null) {
 	};
 }
 
-export async function evaluarConfiguracionWison(textoFuente) {
+export async function evaluarConfiguracionWison(textoFuente, opciones = {}) {
+	const modo = opciones?.modo === 'compilar' ? 'compilar' : 'evaluar';
+
 	if (typeof textoFuente !== 'string' || textoFuente.trim().length === 0) {
 		return {
 			ok: false,
@@ -27,7 +29,7 @@ export async function evaluarConfiguracionWison(textoFuente) {
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify({ textoFuente })
+			body: JSON.stringify({ textoFuente, modo })
 		});
 
 		const data = await response.json();
@@ -72,7 +74,7 @@ export async function evaluarConfiguracionWison(textoFuente) {
 }
 
 export async function compilarAnalizadorWison(textoFuente) {
-	const evaluacion = await evaluarConfiguracionWison(textoFuente);
+	const evaluacion = await evaluarConfiguracionWison(textoFuente, { modo: 'compilar' });
 
 	if (!evaluacion.ok) {
 		return {
