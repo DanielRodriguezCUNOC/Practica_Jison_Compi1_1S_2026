@@ -2,7 +2,7 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import { estadoDelAnalizador, establecerEstadoDelAnalizador } from "$lib/stores/app-store";
   import { establecerErroresDelAnalizador } from "$lib/stores/error-store";
-  import { tokenizadorBasico } from "$lib/services/lexer-basico";
+  import { tokenizarEntradaWison } from "$lib/services/lexer-basico";
   import { ejecutarParserGenerado } from "$lib/services/parser-api";
   import { get } from "svelte/store";
 
@@ -45,8 +45,23 @@
       return;
     }
 
-    // Tokeniza la entrada usando divisor simple.
-    const tokens = tokenizadorBasico(inputText);
+    const terminalesDeclaradas = estadoActual?.ast?.lex?.terminals ?? [];
+    if (!Array.isArray(terminalesDeclaradas) || terminalesDeclaradas.length === 0) {
+      feedbackAnalisis = "El analizador activo no tiene terminales lexicas declaradas.";
+      analizando = false;
+      return;
+    }
+
+    // Tokeniza la entrada usando el lexer definido por la gramatica Wison.
+    const resultadoLexer = tokenizarEntradaWison(inputText, terminalesDeclaradas);
+    if (resultadoLexer.errores.length > 0) {
+      establecerErroresDelAnalizador(resultadoLexer.errores);
+      feedbackAnalisis = `Analisis detenido por ${resultadoLexer.errores.length} error(es) lexico(s).`;
+      analizando = false;
+      return;
+    }
+
+    const tokens = resultadoLexer.tokens;
 
     // Ejecuta el parser con los tokens.
     const resultado = ejecutarParserGenerado(estadoActual.parserGeneradoInstancia, tokens);
