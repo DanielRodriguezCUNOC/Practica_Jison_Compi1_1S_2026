@@ -2,7 +2,6 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import { estadoDelAnalizador, establecerEstadoDelAnalizador } from "$lib/stores/app-store";
   import { establecerErroresDelAnalizador } from "$lib/stores/error-store";
-  import { tokenizarEntradaWison } from "$lib/services/lexer-basico";
   import { ejecutarParserGenerado } from "$lib/services/parser-api";
   import { get } from "svelte/store";
 
@@ -45,26 +44,8 @@
       return;
     }
 
-    const terminalesDeclaradas = estadoActual?.ast?.lex?.terminals ?? [];
-    if (!Array.isArray(terminalesDeclaradas) || terminalesDeclaradas.length === 0) {
-      feedbackAnalisis = "El analizador activo no tiene terminales lexicas declaradas.";
-      analizando = false;
-      return;
-    }
-
-    // Tokeniza la entrada usando el lexer definido por la gramatica Wison.
-    const resultadoLexer = tokenizarEntradaWison(inputText, terminalesDeclaradas);
-    if (resultadoLexer.errores.length > 0) {
-      establecerErroresDelAnalizador(resultadoLexer.errores);
-      feedbackAnalisis = `Analisis detenido por ${resultadoLexer.errores.length} error(es) lexico(s).`;
-      analizando = false;
-      return;
-    }
-
-    const tokens = resultadoLexer.tokens;
-
-    // Ejecuta el parser con los tokens.
-    const resultado = ejecutarParserGenerado(estadoActual.parserGeneradoInstancia, tokens);
+    // Ejecuta el parser directamente sobre texto; el lexer lo resuelve Jison.
+    const resultado = ejecutarParserGenerado(estadoActual.parserGeneradoInstancia, inputText);
 
     // Guarda el resultado en el store para que otros paneles lo vean.
     establecerEstadoDelAnalizador({

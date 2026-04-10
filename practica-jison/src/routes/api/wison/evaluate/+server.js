@@ -3,6 +3,7 @@ import wisonGrammarSource from '$lib/wison/wison-grammar.jison?raw';
 import { validarSemanticaWison } from '$lib/wison/semantic-validator';
 import { calcularPrimeroSiguiente } from '$lib/wison/first-follow';
 import { construirTablaLl1, formatearTablaParseo, formatearConflictos } from '$lib/wison/ll1-table-builder';
+import { generarGramaticaJisonObjetivo } from '$lib/wison/generar-analizador-objetivo';
 
 function crearElementoError(tipo, detalle, linea = null, columna = null) {
 	const posicion = linea != null && columna != null ? ` (L${linea}, C${columna})` : '';
@@ -128,6 +129,8 @@ export async function POST({ request }) {
 		let conjuntosPrimeroSiguiente = null;
 		let tablaLl1 = null;
 		let conflictosLl1 = null;
+		let parserObjetivoGramatica = '';
+		let parserObjetivoFuente = '';
 		if (errores.length === 0) {
 			conjuntosPrimeroSiguiente = calcularPrimeroSiguiente(ast);
 			const resultadoTabla = construirTablaLl1(ast, conjuntosPrimeroSiguiente);
@@ -135,6 +138,22 @@ export async function POST({ request }) {
 			if (resultadoTabla.conflictos.length > 0) {
 				conflictosLl1 = formatearConflictos(resultadoTabla.conflictos);
 			}
+
+			const parserFactoryObjetivo = obtenerFabricaParser(jisonModule);
+			parserObjetivoGramatica = generarGramaticaJisonObjetivo(ast);
+			const parserObjetivo = new parserFactoryObjetivo(parserObjetivoGramatica);
+			const fuenteGenerada =
+				typeof parserObjetivo.generate === 'function'
+					? parserObjetivo.generate()
+					: typeof parserObjetivo.toString === 'function'
+						? parserObjetivo.toString()
+						: '';
+
+			if (typeof fuenteGenerada !== 'string' || fuenteGenerada.trim().length === 0) {
+				throw new Error('No se pudo generar el codigo fuente del analizador objetivo.');
+			}
+
+			parserObjetivoFuente = fuenteGenerada;
 		}
 
 		return json({
@@ -143,7 +162,9 @@ export async function POST({ request }) {
 			errores,
 			conjuntosPrimeroSiguiente,
 			tablaLl1,
-			conflictosLl1
+			conflictosLl1,
+			parserObjetivoGramatica,
+			parserObjetivoFuente
 		});
 	} catch (error) {
 		return json({
