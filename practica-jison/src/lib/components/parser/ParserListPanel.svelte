@@ -1,25 +1,28 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount } from "svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
-  import { listarAnalizadoresApi, obtenerAnalizadorApi } from '$lib/services/api-client';
-  import { establecerEstadoDelAnalizador } from '$lib/stores/app-store';
+  import {
+    listarAnalizadoresApi,
+    obtenerAnalizadorApi,
+  } from "$lib/services/api-client";
+  import { establecerEstadoDelAnalizador } from "$lib/stores/app-store";
 
   let parsers = $state([]);
   let selectedId = $state(null);
   let cargandoLista = $state(false);
   let cargandoItem = $state(false);
-  let mensaje = $state('');
+  let mensaje = $state("");
 
   async function onRecargarLista() {
     cargandoLista = true;
-    mensaje = '';
+    mensaje = "";
     try {
       const items = await listarAnalizadoresApi();
       parsers = items.map((item) => ({
         id: item.id,
         name: item.nombre,
-        status: 'GUARDADO',
-        fechaCreacion: item.fechaCreacion
+        status: "GUARDADO",
+        fechaCreacion: item.fechaCreacion,
       }));
 
       if (parsers.length > 0 && selectedId == null) {
@@ -27,7 +30,7 @@
       }
 
       if (parsers.length === 0) {
-        mensaje = 'No hay analizadores guardados.';
+        mensaje = "No hay analizadores guardados.";
       }
     } catch (error) {
       mensaje = `Error al listar: ${error.message}`;
@@ -38,18 +41,18 @@
 
   async function onCargarSeleccionado() {
     if (selectedId == null) {
-      mensaje = 'Selecciona un analizador de la lista.';
+      mensaje = "Selecciona un analizador de la lista.";
       return;
     }
 
     cargandoItem = true;
-    mensaje = '';
+    mensaje = "";
     try {
       const data = await obtenerAnalizadorApi(selectedId);
       establecerEstadoDelAnalizador({
         analizadorSeleccionadoId: data?.id ?? selectedId,
-        analizadorSeleccionadoNombre: data?.nombre ?? '',
-        wisonFuenteSeleccionada: data?.wisonSource ?? ''
+        analizadorSeleccionadoNombre: data?.nombre ?? "",
+        wisonFuenteSeleccionada: data?.wisonSource ?? "",
       });
       mensaje = `Analizador cargado: ${data?.nombre ?? selectedId}`;
     } catch (error) {
@@ -69,11 +72,21 @@
   subtitle="Selecciona uno para probar cadenas de entrada"
 >
   {#snippet actions()}
-    <button type="button" onclick={onRecargarLista} disabled={cargandoLista}>
-      {cargandoLista ? 'Recargando...' : 'Recargar'}
+    <button
+      type="button"
+      class="action-button"
+      onclick={onRecargarLista}
+      disabled={cargandoLista}
+    >
+      {cargandoLista ? "Recargando..." : "Recargar"}
     </button>
-    <button type="button" onclick={onCargarSeleccionado} disabled={cargandoItem || selectedId == null}>
-      {cargandoItem ? 'Cargando...' : 'Cargar al Editor'}
+    <button
+      type="button"
+      class="action-button"
+      onclick={onCargarSeleccionado}
+      disabled={cargandoItem || selectedId == null}
+    >
+      {cargandoItem ? "Cargando..." : "Cargar al Editor"}
     </button>
   {/snippet}
 
@@ -84,8 +97,10 @@
   <ul>
     {#each parsers as parser}
       <li class:selected={selectedId === parser.id}>
-        <button type="button" onclick={() => (selectedId = parser.id)}
-          >{parser.name}</button
+        <button
+          type="button"
+          class="parser-button"
+          onclick={() => (selectedId = parser.id)}>{parser.name}</button
         >
 
         <span>{parser.status}</span>
@@ -119,11 +134,37 @@
     box-shadow: 0 6px 16px rgba(209, 83, 30, 0.16);
   }
 
-  button {
+  .action-button {
+    border: 0;
+    border-radius: 0.6rem;
+    padding: 0.45rem 0.85rem;
+    font: 700 0.73rem/1 var(--font-mono);
+    letter-spacing: 0.02em;
+    background: var(--color-accent);
+    color: #231207;
+    cursor: pointer;
+  }
+
+  .action-button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  .parser-button {
     all: unset;
     cursor: pointer;
     font: 600 0.84rem/1.25 var(--font-text);
     color: var(--color-ink);
+  }
+
+  .parser-button:hover {
+    color: #8d3915;
+  }
+
+  .parser-button:focus-visible {
+    outline: 2px solid rgba(209, 83, 30, 0.45);
+    outline-offset: 2px;
+    border-radius: 0.3rem;
   }
 
   span {

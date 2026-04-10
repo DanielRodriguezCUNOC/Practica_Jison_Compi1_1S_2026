@@ -1,6 +1,7 @@
 <script>
 	import Panel from "$lib/components/ui/Panel.svelte";
 	import { evaluarConfiguracionWison } from "$lib/services/jison-service";
+	import { guardarAnalizadorApi } from "$lib/services/api-client";
 	import {
 		limpiarErroresDelAnalizador,
 		establecerErroresDelAnalizador,
@@ -19,9 +20,15 @@ Initial_Sim %_E;
 :}}
 ? Wison`);
 	let isEvaluating = $state(false);
+	let isSaving = $state(false);
 	let feedback = $state("");
+	let nombreAnalizador = $state("");
 	let areaEditor = $state();
 	let lineaEditor = $state();
+
+	function tienaNombreValido() {
+		return nombreAnalizador && nombreAnalizador.trim().length > 0;
+	}
 
 	function obtenerNumerosDeLinea(texto) {
 		const totalLineas = Math.max(1, texto.split("\n").length);
@@ -76,6 +83,26 @@ Initial_Sim %_E;
 		sampleGrammar = fileContent;
 		feedback = `Archivo cargado: ${file.name}`;
 	}
+
+	async function onGuardarAnalizador() {
+		if (!nombreAnalizador.trim()) {
+			feedback = "Por favor ingresa un nombre para el analizador.";
+			return;
+		}
+
+		isSaving = true;
+		feedback = "";
+
+		try {
+			await guardarAnalizadorApi(nombreAnalizador.trim(), sampleGrammar);
+			feedback = `Analizador "${nombreAnalizador}" guardado exitosamente.`;
+			nombreAnalizador = "";
+		} catch (error) {
+			feedback = `Error al guardar: ${error.message || "Error desconocido"}`;
+		} finally {
+			isSaving = false;
+		}
+	}
 </script>
 
 <Panel
@@ -84,13 +111,23 @@ Initial_Sim %_E;
 	tone="accent"
 >
 	{#snippet actions()}
-		<button
-			type="button"
-			onclick={onEvaluateConfiguration}
-			disabled={isEvaluating}
-		>
-			{isEvaluating ? "Evaluando..." : "Evaluar Configuracion"}
-		</button>
+		<div class="button-group">
+			<button
+				type="button"
+				onclick={onEvaluateConfiguration}
+				disabled={isEvaluating}
+			>
+				{isEvaluating ? "Evaluando..." : "Evaluar Configuracion"}
+			</button>
+			<button
+				type="button"
+				onclick={onGuardarAnalizador}
+				disabled={isSaving || !tienaNombreValido()}
+				class="save-button"
+			>
+				{isSaving ? "Guardando..." : "Guardar en BD"}
+			</button>
+		</div>
 	{/snippet}
 
 	<div class="toolbar">
@@ -102,6 +139,12 @@ Initial_Sim %_E;
 			/>
 			<span>Cargar archivo</span>
 		</label>
+		<input
+			type="text"
+			bind:value={nombreAnalizador}
+			placeholder="Nombre del analizador (para guardar en BD)"
+			class="nombre-input"
+		/>
 		<span class="hint">Se admiten archivos .jison y .txt</span>
 	</div>
 
@@ -245,5 +288,34 @@ Initial_Sim %_E;
 	button:disabled {
 		opacity: 0.65;
 		cursor: not-allowed;
+	}
+
+	.button-group {
+		display: flex;
+		gap: 0.6rem;
+		align-items: center;
+	}
+
+	.save-button {
+		background: var(--color-accent-alt, #4ade80);
+	}
+
+	.nombre-input {
+		flex: 1;
+		min-width: 15rem;
+		padding: 0.45rem 0.65rem;
+		border: 1px solid rgba(25, 41, 74, 0.25);
+		border-radius: 0.6rem;
+		font: 500 0.78rem/1.2 var(--font-mono);
+		outline: none;
+	}
+
+	.nombre-input::placeholder {
+		color: rgba(239, 243, 255, 0.4);
+	}
+
+	.nombre-input:focus {
+		border-color: var(--color-accent);
+		background: rgba(240, 163, 74, 0.1);
 	}
 </style>
