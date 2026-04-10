@@ -1,3 +1,6 @@
+import { generarParserDescendente } from "$lib/wison/recursive-descent-generator";
+import { inyectarParserEnCaliente } from "$lib/services/parser-api";
+
 function crearElementoError(tipo, detalle, linea = null, columna = null) {
 	const posicion = linea != null && columna != null ? ` (L${linea}, C${columna})` : '';
 	return {
@@ -12,6 +15,9 @@ export async function evaluarConfiguracionWison(textoFuente) {
 		return {
 			ok: false,
 			ast: null,
+			conjuntosPrimeroSiguiente: null,
+			tablaLl1: null,
+			conflictosLl1: null,
 			errores: [crearElementoError('Validacion', 'La configuración está vacía.')]
 		};
 	}
@@ -30,6 +36,9 @@ export async function evaluarConfiguracionWison(textoFuente) {
 			return {
 				ok: false,
 				ast: null,
+				conjuntosPrimeroSiguiente: null,
+				tablaLl1: null,
+				conflictosLl1: null,
 				errores: data?.errores ?? [crearElementoError('Infraestructura', 'Fallo la evaluacion en servidor.')]
 			};
 		}
@@ -37,18 +46,71 @@ export async function evaluarConfiguracionWison(textoFuente) {
 		return {
 			ok: Boolean(data?.ok),
 			ast: data?.ast ?? null,
+			conjuntosPrimeroSiguiente: data?.conjuntosPrimeroSiguiente ?? null,
+			tablaLl1: data?.tablaLl1 ?? null,
+			conflictosLl1: data?.conflictosLl1 ?? null,
 			errores: Array.isArray(data?.errores) ? data.errores : []
 		};
 	} catch (error) {
 		return {
 			ok: false,
 			ast: null,
+			conjuntosPrimeroSiguiente: null,
+			tablaLl1: null,
+			conflictosLl1: null,
 			errores: [
 				crearElementoError(
 					'Infraestructura',
 					`No se pudo completar la evaluacion de la configuracion. Detalle tecnico: ${error.message}`
 				)
 			]
+		};
+	}
+}
+
+export async function compilarAnalizadorWison(textoFuente) {
+	const evaluacion = await evaluarConfiguracionWison(textoFuente);
+
+	if (!evaluacion.ok) {
+		return {
+			...evaluacion,
+			parserGeneradoFuente: '',
+			parserGeneradoInstancia: null
+		};
+	}
+
+	if (Array.isArray(evaluacion.conflictosLl1) && evaluacion.conflictosLl1.length > 0) {
+		return {
+			ok: false,
+			ast: evaluacion.ast,
+			conjuntosPrimeroSiguiente: evaluacion.conjuntosPrimeroSiguiente,
+			tablaLl1: evaluacion.tablaLl1,
+			conflictosLl1: evaluacion.conflictosLl1,
+			parserGeneradoFuente: '',
+			parserGeneradoInstancia: null,
+			errores: evaluacion.conflictosLl1
+		};
+	}
+
+	try {
+		const parserGeneradoFuente = generarParserDescendente(evaluacion.ast, evaluacion.tablaLl1);
+		const parserGeneradoInstancia = inyectarParserEnCaliente(parserGeneradoFuente);
+
+		return {
+			...evaluacion,
+			parserGeneradoFuente,
+			parserGeneradoInstancia
+		};
+	} catch (error) {
+		return {
+			ok: false,
+			ast: evaluacion.ast,
+			conjuntosPrimeroSiguiente: evaluacion.conjuntosPrimeroSiguiente,
+			tablaLl1: evaluacion.tablaLl1,
+			conflictosLl1: evaluacion.conflictosLl1,
+			parserGeneradoFuente: '',
+			parserGeneradoInstancia: null,
+			errores: [crearElementoError('Infraestructura', `Error al generar el analizador. ${error.message}`)]
 		};
 	}
 }

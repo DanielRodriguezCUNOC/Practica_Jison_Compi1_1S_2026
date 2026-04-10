@@ -1,10 +1,15 @@
 <script>
   import { onMount } from "svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
+  import { compilarAnalizadorWison } from "$lib/services/jison-service";
   import {
     listarAnalizadoresApi,
     obtenerAnalizadorApi,
   } from "$lib/services/api-client";
+  import {
+    limpiarErroresDelAnalizador,
+    establecerErroresDelAnalizador,
+  } from "$lib/stores/error-store";
   import { establecerEstadoDelAnalizador } from "$lib/stores/app-store";
 
   let parsers = $state([]);
@@ -47,14 +52,39 @@
 
     cargandoItem = true;
     mensaje = "";
+    limpiarErroresDelAnalizador();
     try {
       const data = await obtenerAnalizadorApi(selectedId);
+
+      const resultado = await compilarAnalizadorWison(data?.wisonSource ?? "");
+      establecerErroresDelAnalizador(resultado.errores);
+
+      if (!resultado.ok) {
+        establecerEstadoDelAnalizador({
+          status: "error",
+          analizadorSeleccionadoId: data?.id ?? selectedId,
+          analizadorSeleccionadoNombre: data?.nombre ?? "",
+          wisonFuenteSeleccionada: data?.wisonSource ?? "",
+          parserGeneradoFuente: "",
+          parserGeneradoInstancia: null,
+        });
+        mensaje = `No se pudo compilar: ${resultado.errores.length} error(es).`;
+        return;
+      }
+
       establecerEstadoDelAnalizador({
+        status: "success",
+        ast: resultado.ast,
+        conjuntosPrimeroSiguiente: resultado.conjuntosPrimeroSiguiente,
+        tablaLl1: resultado.tablaLl1,
+        conflictosLl1: resultado.conflictosLl1,
+        parserGeneradoFuente: resultado.parserGeneradoFuente,
+        parserGeneradoInstancia: resultado.parserGeneradoInstancia,
         analizadorSeleccionadoId: data?.id ?? selectedId,
         analizadorSeleccionadoNombre: data?.nombre ?? "",
         wisonFuenteSeleccionada: data?.wisonSource ?? "",
       });
-      mensaje = `Analizador cargado: ${data?.nombre ?? selectedId}`;
+      mensaje = `Analizador cargado y compilado: ${data?.nombre ?? selectedId}`;
     } catch (error) {
       mensaje = `Error al cargar: ${error.message}`;
     } finally {
