@@ -3,6 +3,7 @@ import wisonGrammarSource from '$lib/wison/wison-grammar.jison?raw';
 import { validarSemanticaWison } from '$lib/wison/semantic-validator';
 import { calcularPrimeroSiguiente } from '$lib/wison/first-follow';
 import { construirTablaLl1, formatearTablaParseo, formatearConflictos } from '$lib/wison/ll1-table-builder';
+import { generarGramaticaJisonObjetivo } from '$lib/wison/generar-analizador-objetivo';
 
 function crearElementoError(tipo, detalle, linea = null, columna = null) {
 	const posicion = linea != null && columna != null ? ` (L${linea}, C${columna})` : '';
@@ -39,7 +40,7 @@ function mapearErrorLanzadoParser(error) {
 	const mensajeCrudo = String(error?.message ?? 'Error de analisis no controlado.');
 	if (/is not defined/i.test(mensajeCrudo)) {
 		return crearElementoError(
-			'Infraestructura',
+			'Estructura',
 			`Error interno del evaluador de Wison. No es un error de tu archivo. Detalle tecnico: ${mensajeCrudo}`
 		);
 	}
@@ -74,6 +75,7 @@ export async function POST({ request }) {
 	}
 
 	const textoFuente = datosSolicitud?.textoFuente;
+	const modo = datosSolicitud?.modo === 'compilar' ? 'compilar' : 'evaluar';
 	if (typeof textoFuente !== 'string' || textoFuente.trim().length === 0) {
 		return json({
 			ok: false,
@@ -83,8 +85,9 @@ export async function POST({ request }) {
 	}
 
 	let parser;
+	let jisonModule;
 	try {
-		const jisonModule = await import('jison');
+		jisonModule = await import('jison');
 		const fabricaParser = obtenerFabricaParser(jisonModule);
 		parser = new fabricaParser(wisonGrammarSource);
 		parser.yy = {
@@ -106,7 +109,7 @@ export async function POST({ request }) {
 				ast: null,
 				errores: [
 					crearElementoError(
-						'Infraestructura',
+						'Estructura',
 						`No se pudo inicializar Jison en servidor. Detalle: ${error.message}`
 					)
 				]
@@ -128,13 +131,31 @@ export async function POST({ request }) {
 		let conjuntosPrimeroSiguiente = null;
 		let tablaLl1 = null;
 		let conflictosLl1 = null;
-		if (errores.length === 0) {
+		let parserObjetivoGramatica = '';
+		let parserObjetivoFuente = '';
+		if (errores.length === 0 && modo === 'compilar') {
 			conjuntosPrimeroSiguiente = calcularPrimeroSiguiente(ast);
 			const resultadoTabla = construirTablaLl1(ast, conjuntosPrimeroSiguiente);
 			tablaLl1 = formatearTablaParseo(resultadoTabla.tabla);
 			if (resultadoTabla.conflictos.length > 0) {
 				conflictosLl1 = formatearConflictos(resultadoTabla.conflictos);
 			}
+
+			const parserFactoryObjetivo = obtenerFabricaParser(jisonModule);
+			parserObjetivoGramatica = generarGramaticaJisonObjetivo(ast);
+			const parserObjetivo = new parserFactoryObjetivo(parserObjetivoGramatica);
+			const fuenteGenerada =
+				typeof parserObjetivo.generate === 'function'
+					? parserObjetivo.generate()
+					: typeof parserObjetivo.toString === 'function'
+						? parserObjetivo.toString()
+						: '';
+
+			if (typeof fuenteGenerada !== 'string' || fuenteGenerada.trim().length === 0) {
+				throw new Error('No se pudo generar el codigo fuente del analizador objetivo.');
+			}
+
+			parserObjetivoFuente = fuenteGenerada;
 		}
 
 		return json({
@@ -143,7 +164,9 @@ export async function POST({ request }) {
 			errores,
 			conjuntosPrimeroSiguiente,
 			tablaLl1,
-			conflictosLl1
+			conflictosLl1,
+			parserObjetivoGramatica,
+			parserObjetivoFuente
 		});
 	} catch (error) {
 		return json({
