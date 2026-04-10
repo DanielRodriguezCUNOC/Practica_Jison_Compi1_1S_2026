@@ -1,6 +1,6 @@
 <script>
 	import Panel from "$lib/components/ui/Panel.svelte";
-	import { evaluarConfiguracionWison } from "$lib/services/jison-service";
+	import { compilarAnalizadorWison } from "$lib/services/jison-service";
 	import { guardarAnalizadorApi } from "$lib/services/api-client";
 	import {
 		limpiarErroresDelAnalizador,
@@ -52,16 +52,21 @@ Initial_Sim %_E;
 		feedback = "";
 		limpiarErroresDelAnalizador();
 
-		const resultado = await evaluarConfiguracionWison(sampleGrammar);
+		const resultado = await compilarAnalizadorWison(sampleGrammar);
 		establecerErroresDelAnalizador(resultado.errores);
 
 		if (resultado.ok) {
 			establecerEstadoDelAnalizador({
 				status: "success",
 				ast: resultado.ast,
+				conjuntosPrimeroSiguiente: resultado.conjuntosPrimeroSiguiente,
+				tablaLl1: resultado.tablaLl1,
+				conflictosLl1: resultado.conflictosLl1,
+				parserGeneradoFuente: resultado.parserGeneradoFuente,
+				parserGeneradoInstancia: resultado.parserGeneradoInstancia,
 				message: "Configuración válida.",
 			});
-			feedback = "Configuración válida.";
+			feedback = "Configuración válida y analizador listo.";
 		} else {
 			establecerEstadoDelAnalizador({
 				status: "error",
