@@ -100,8 +100,8 @@ class GeneradorAnalizadorObjetivo {
 				resultado += '\\"';
 				continue;
 			}
-			// Incluye '#', '/', ';' y ':' porque jison-lex los usa en su sintaxis de reglas.
-			if ('\\^$.*+?()[]{}|/;:#,'.indexOf(caracter) >= 0) {
+			// Incluye literales que jison-lex puede interpretar como sintaxis de regla.
+			if ('\\^$.*+?()[]{}|/;:#,\-=<>'.indexOf(caracter) >= 0) {
 				resultado += '\\' + caracter;
 			} else {
 				resultado += caracter;
