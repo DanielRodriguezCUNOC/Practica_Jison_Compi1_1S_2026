@@ -65,7 +65,7 @@ export async function evaluarConfiguracionWison(textoFuente, opciones = {}) {
 			parserObjetivoFuente: '',
 			errores: [
 				crearElementoError(
-					'Infraestructura',
+					'Estructura',
 					`No se pudo completar la evaluacion de la configuracion. Detalle tecnico: ${error.message}`
 				)
 			]
@@ -93,7 +93,7 @@ export async function compilarAnalizadorWison(textoFuente) {
 		}
 
 		const parserGeneradoInstancia = inyectarParserEnCaliente(parserObjetivoFuente);
-
+   
 		return {
 			...evaluacion,
 			parserGeneradoFuente,

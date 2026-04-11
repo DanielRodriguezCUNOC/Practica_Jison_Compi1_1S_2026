@@ -55,6 +55,7 @@
     limpiarErroresDelAnalizador();
     try {
       const data = await obtenerAnalizadorApi(selectedId);
+      console.log(data);
 
       const resultado = await compilarAnalizadorWison(data?.wisonSource ?? "");
       establecerErroresDelAnalizador(resultado.errores);
