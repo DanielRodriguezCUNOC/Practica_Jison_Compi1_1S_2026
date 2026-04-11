@@ -63,6 +63,7 @@ Initial_Sim %_E;
 				tablaLl1: null,
 				conflictosLl1: null,
 				parserGeneradoFuente: "",
+				parserObjetivoFuente: "",
 				parserGeneradoInstancia: null,
 				message: "Configuración válida.",
 			});
@@ -75,6 +76,7 @@ Initial_Sim %_E;
 				tablaLl1: null,
 				conflictosLl1: null,
 				parserGeneradoFuente: "",
+				parserObjetivoFuente: "",
 				parserGeneradoInstancia: null,
 				message: `Se detectaron ${resultado.errores.length} error(es).`,
 			});
