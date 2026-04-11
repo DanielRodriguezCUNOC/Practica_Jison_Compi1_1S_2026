@@ -95,8 +95,13 @@ class GeneradorAnalizadorObjetivo {
 				resultado += '\\x20';
 				continue;
 			}
-			// Incluye '#', '/', ';' y ':' porque jison-lex los usa en su sintaxis de reglas.
-			if ('\\^$.*+?()[]{}|/;:#'.indexOf(caracter) >= 0) {
+			// Mantiene comillas dobles como literal válido dentro de reglas regex de jison-lex.
+			if (caracter === '"') {
+				resultado += '\\"';
+				continue;
+			}
+			// Incluye literales que jison-lex puede interpretar como sintaxis de regla.
+			if ('\\^$.*+?()[]{}|/;:#,\-=<>'.indexOf(caracter) >= 0) {
 				resultado += '\\' + caracter;
 			} else {
 				resultado += caracter;
