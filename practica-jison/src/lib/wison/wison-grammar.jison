@@ -69,9 +69,7 @@ function registrarErrorSintactico(mensaje, lexema, linea, columna) {
 
 //* Literales
 \'[^\\']*\'             { yytext = yytext.slice(1, -1); return 'CADENA';}
-\[a-zA-Z\]             return 'ALFANUMERICO';
-\[aA\-zZ\]             return 'ALFANUMERICO';
-\[A\-Z\]               return 'ALFANUMERICO';
+\[aA\-zZ\]             return 'RANGO_LETRAS';
 \[0\-9\]               return 'NUMERO';
 
 
@@ -211,7 +209,7 @@ operador_unario
 unidad_lexica
     : CADENA
     { $$ = { type: 'literal', value: $1 }; }
-    | ALFANUMERICO
+    | RANGO_LETRAS
     { $$ = { type: 'alfanumerico', value: $1 }; }
     | NUMERO
     { $$ = { type: 'numero', value: $1 }; }

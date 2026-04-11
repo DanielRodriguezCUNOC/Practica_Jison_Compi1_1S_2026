@@ -28,7 +28,7 @@ class GeneradorAnalizadorObjetivo {
 		const simboloInicial = this.obtenerSimboloInicialMapeado();
 
 		const reglasLex = this.construirReglasLex();
-		const reglasSintacticas = this.construirReglasSintacticas();
+		const reglasSintacticas = this.construirReglasSintacticas(simboloInicial);
 		const partes = this.construirPartesDeGramatica(simboloInicial, reglasLex, reglasSintacticas);
 		return partes.join('\n');
 	}
@@ -90,7 +90,13 @@ class GeneradorAnalizadorObjetivo {
 		let resultado = '';
 		for (let i = 0; i < valor.length; i += 1) {
 			const caracter = valor.charAt(i);
-			if ('\\^$.*+?()[]{}|'.indexOf(caracter) >= 0) {
+			// Evita que espacios literales se interpreten como Tokens.
+			if (caracter === ' ') {
+				resultado += '\\x20';
+				continue;
+			}
+			// Incluye '#', '/', ';' y ':' porque jison-lex los usa en su sintaxis de reglas.
+			if ('\\^$.*+?()[]{}|/;:#'.indexOf(caracter) >= 0) {
 				resultado += '\\' + caracter;
 			} else {
 				resultado += caracter;
@@ -100,18 +106,19 @@ class GeneradorAnalizadorObjetivo {
 		return resultado;
 	}
 
-	// Normaliza las clases especiales definidas en Wison. Esto permite que clases como [a-zA-Z] o [0-9] se conviertan a formas compatibles con Jison y se eviten caracteres no soportados en regex. Si la clase no es reconocida, se devuelve una clase genérica que acepta cualquier caracter alfanumerico o guion bajo para evitar errores de regex invalidos.
+	// Normaliza las clases especiales válidas en Wison [aA-zZ] y [0-9].
+	// Rechaza cualquier otra clase de carácter.
 	normalizarClase(valorOriginal) {
 		if (typeof valorOriginal !== 'string') {
-			return '[A-Za-z0-9_]';
+			throw new Error('Clase de carácter inválida: el valor no es una cadena.');
 		}
 
 		const valor = valorOriginal.replace(/\s+/g, '');
-		if (valor === '[aA-zZ]' || valor === '[a-zA-Z]') return '[A-Za-z]';
-		if (valor === '[A-Z]') return '[A-Z]';
+		
+		if (valor === '[aA-zZ]') return '[A-Za-z]';
 		if (valor === '[0-9]') return '[0-9]';
 
-		return valor;
+		throw new Error(`Clase de carácter no soportada: ${valorOriginal}. Solo se permiten [aA-zZ] y [0-9].`);
 	}
 
 	// Convierte ids de Wison a identificadores.
@@ -262,23 +269,148 @@ class GeneradorAnalizadorObjetivo {
 	construirReglasLex() {
 		const terminales = Array.isArray(this.ast?.lex?.terminals) ? this.ast.lex.terminals : [];
 		this.prepararTerminalesPorId(terminales);
+		const terminalesOrdenados = this.ordenarTerminalesPorPrioridad(terminales);
 
 		const lineas = [];
-		lineas.push('\t\\s+                              /* ignorar espacios en blanco */');
+		lineas.push('\\s+                              { /* ignorar espacios en blanco */ }');
 
-		for (let i = 0; i < terminales.length; i += 1) {
-			const terminal = terminales[i];
+		for (let i = 0; i < terminalesOrdenados.length; i += 1) {
+			const terminal = terminalesOrdenados[i];
 			if (!terminal?.id) continue;
 
 			const token = this.mapaTerminales[terminal.id];
 			const regex = this.convertirExpresionARegex(terminal.expr ?? []);
-			lineas.push(`\t${regex}                              return '${token}';`);
+			lineas.push(`${regex}                              return '${token}';`);
 		}
 
-		lineas.push("\t<<EOF>>                          return 'EOF';");
-		lineas.push('\t.                                { throw new Error(\'Token no reconocido: \'+ yytext); }');
+		lineas.push("<<EOF>>                          return 'EOF';");
+		lineas.push('.                                { throw new Error(\'Token no reconocido: \'+ yytext); }');
 
 		return lineas.join('\n');
+	}
+
+	// Ordena terminales por prioridad sin usar funciones flecha.
+	ordenarTerminalesPorPrioridad(terminales) {
+		const literales = [];
+		const referencias = [];
+		const genericos = [];
+		const otros = [];
+
+		for (let i = 0; i < terminales.length; i += 1) {
+			const terminal = terminales[i];
+			const prioridad = this.obtenerPrioridadLexicaTerminal(terminal);
+
+			if (prioridad === 0) {
+				literales.push(terminal);
+			} else if (prioridad === 1) {
+				referencias.push(terminal);
+			} else if (prioridad === 2) {
+				genericos.push(terminal);
+			} else {
+				otros.push(terminal);
+			}
+		}
+
+		this.ordenarPorLongitudDescendente(literales);
+		this.ordenarPorLongitudDescendente(referencias);
+		this.ordenarPorLongitudDescendente(genericos);
+		this.ordenarPorLongitudDescendente(otros);
+
+		return literales.concat(referencias, genericos, otros);
+	}
+
+	ordenarPorLongitudDescendente(lista) {
+		lista.sort(function (a, b) {
+			const longitudA = this.obtenerLongitudExpresionLexica(a?.expr ?? []);
+			const longitudB = this.obtenerLongitudExpresionLexica(b?.expr ?? []);
+			return longitudB - longitudA;
+		}.bind(this));
+	}
+
+	visitarNodosLexicos(nodo, estado) {
+		if (Array.isArray(nodo)) {
+			for (let i = 0; i < nodo.length; i += 1) {
+				this.visitarNodosLexicos(nodo[i], estado);
+			}
+			return;
+		}
+
+		if (!nodo || typeof nodo !== 'object') {
+			return;
+		}
+
+		if (nodo.type === 'literal') {
+			estado.tieneLiteral = true;
+			return;
+		}
+
+		if (nodo.type === 'terminal_ref') {
+			estado.tieneReferencia = true;
+			return;
+		}
+
+		if (nodo.type === 'alfanumerico' || nodo.type === 'numero') {
+			estado.tieneClaseGenerica = true;
+			return;
+		}
+
+		if (nodo.type === 'unario') {
+			estado.tieneUnario = true;
+			this.visitarNodosLexicos(nodo.value, estado);
+		}
+	}
+
+	// Define prioridad para que terminales literales se evalúen antes que clases genéricas.
+	obtenerPrioridadLexicaTerminal(terminal) {
+		const expresion = Array.isArray(terminal?.expr) ? terminal.expr : [];
+		const estado = {
+			tieneLiteral: false,
+			tieneClaseGenerica: false,
+			tieneReferencia: false,
+			tieneUnario: false
+		};
+
+		this.visitarNodosLexicos(expresion, estado);
+
+		if (estado.tieneLiteral && !estado.tieneClaseGenerica && !estado.tieneReferencia && !estado.tieneUnario) {
+			return 0;
+		}
+
+		if (estado.tieneReferencia) {
+			return 1;
+		}
+
+		if (estado.tieneUnario || estado.tieneClaseGenerica) {
+			return 2;
+		}
+
+		return 3;
+	}
+
+	// Cuenta la cantidad de nodos relevantes de una expresion lexical para desempatar prioridades.
+	obtenerLongitudExpresionLexica(expresion) {
+		const lista = Array.isArray(expresion) ? expresion : [];
+		return this.contarNodosLexicos(lista);
+	}
+
+	contarNodosLexicos(nodo) {
+		if (Array.isArray(nodo)) {
+			let acumulado = 0;
+			for (let i = 0; i < nodo.length; i += 1) {
+				acumulado += this.contarNodosLexicos(nodo[i]);
+			}
+			return acumulado;
+		}
+
+		if (!nodo || typeof nodo !== 'object') {
+			return 0;
+		}
+
+		if (nodo.type === 'unario') {
+			return this.contarNodosLexicos(nodo.value);
+		}
+
+		return 1;
 	}
 
 	// Prepara un indice de terminales por id para resolver referencias.
@@ -322,14 +454,16 @@ class GeneradorAnalizadorObjetivo {
 
 
 	// Construye las reglas sintacticas del bloque de gramatica.
-	construirReglasSintacticas() {
+	construirReglasSintacticas(simboloInicial) {
 		const agrupadas = this.agruparProduccionesPorNoTerminal();
 		const noTerminales = Object.keys(agrupadas);
 		const bloques = [];
 
 		for (let i = 0; i < noTerminales.length; i += 1) {
 			const lhsOriginal = noTerminales[i];
-			bloques.push(this.construirBloqueNoTerminal(lhsOriginal, agrupadas[lhsOriginal]));
+			const lhsMapeado = this.mapaNoTerminales[lhsOriginal];
+			const esInicial = lhsMapeado === simboloInicial;
+			bloques.push(this.construirBloqueNoTerminal(lhsOriginal, agrupadas[lhsOriginal], esInicial));
 		}
 
 		return bloques.join('\n\n');
@@ -358,24 +492,27 @@ class GeneradorAnalizadorObjetivo {
 	}
 
 	// Arma el bloque completo de un no terminal.
-	construirBloqueNoTerminal(lhsOriginal, alternativas) {
+	construirBloqueNoTerminal(lhsOriginal, alternativas, agregarEOF = false) {
 		const lhs = this.mapaNoTerminales[lhsOriginal];
 		if (!lhs) {
 			throw new Error(`No terminal sin declaracion en sintaxis: ${lhsOriginal}`);
 		}
 
-		const lineasAlternativas = this.construirLineasAlternativas(lhsOriginal, alternativas);
+		const lineasAlternativas = this.construirLineasAlternativas(lhsOriginal, alternativas, agregarEOF);
 		return `${lhs}\n\t: ${lineasAlternativas.join('\n\t| ')}\n\t;`;
 	}
 
 	// Convierte alternativas a lineas jison.
-	construirLineasAlternativas(lhsOriginal, alternativas) {
+	construirLineasAlternativas(lhsOriginal, alternativas, agregarEOF = false) {
 		const lineas = [];
 		const lista = Array.isArray(alternativas) ? alternativas : [];
 
 		for (let j = 0; j < lista.length; j += 1) {
 			const secuenciaMapeada = this.mapearSecuenciaProduccion(lista[j]);
-			const cuerpo = secuenciaMapeada.length > 0 ? secuenciaMapeada.join(' ') : '/* empty */';
+			let cuerpo = secuenciaMapeada.length > 0 ? secuenciaMapeada.join(' ') : '/* empty */';
+			if (agregarEOF) {
+				cuerpo = `${cuerpo} EOF`;
+			}
 			lineas.push(`	${cuerpo}`);
 		}
 
