@@ -16,6 +16,8 @@ const ESTADO_INICIAL = {
 	conflictosLl1: null,
 	// Codigo fuente del parser descendente generado.
 	parserGeneradoFuente: '',
+	// Codigo JavaScript del analizador objetivo compilado por Jison.
+	parserObjetivoFuente: '',
 	// Instancia activa del parser inyectado en caliente.
 	parserGeneradoInstancia: null,
 	// Resultado de analizar una cadena de entrada.

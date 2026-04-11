@@ -10,13 +10,36 @@
     limpiarErroresDelAnalizador,
     establecerErroresDelAnalizador,
   } from "$lib/stores/error-store";
-  import { establecerEstadoDelAnalizador } from "$lib/stores/app-store";
+  import { estadoDelAnalizador, establecerEstadoDelAnalizador } from "$lib/stores/app-store";
 
   let parsers = $state([]);
   let selectedId = $state(null);
   let cargandoLista = $state(false);
   let cargandoItem = $state(false);
   let mensaje = $state("");
+
+  function descargarAnalizadorObjetivo() {
+    const codigoFuente = $estadoDelAnalizador?.parserObjetivoFuente ?? "";
+    if (typeof codigoFuente !== "string" || codigoFuente.trim().length === 0) {
+      mensaje = "Primero carga y compila un analizador para descargarlo.";
+      return;
+    }
+
+    const nombreBase = String($estadoDelAnalizador?.analizadorSeleccionadoNombre ?? "analizador")
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-_]/g, "") || "analizador";
+
+    const archivo = new Blob([codigoFuente], { type: "text/javascript;charset=utf-8" });
+    const url = URL.createObjectURL(archivo);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = `${nombreBase}-objetivo.js`;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(url);
+  }
 
   async function onRecargarLista() {
     cargandoLista = true;
@@ -67,6 +90,7 @@
           analizadorSeleccionadoNombre: data?.nombre ?? "",
           wisonFuenteSeleccionada: data?.wisonSource ?? "",
           parserGeneradoFuente: "",
+          parserObjetivoFuente: "",
           parserGeneradoInstancia: null,
         });
         mensaje = `No se pudo compilar: ${resultado.errores.length} error(es).`;
@@ -80,6 +104,7 @@
         tablaLl1: resultado.tablaLl1,
         conflictosLl1: resultado.conflictosLl1,
         parserGeneradoFuente: resultado.parserGeneradoFuente,
+        parserObjetivoFuente: resultado.parserObjetivoFuente ?? "",
         parserGeneradoInstancia: resultado.parserGeneradoInstancia,
         analizadorSeleccionadoId: data?.id ?? selectedId,
         analizadorSeleccionadoNombre: data?.nombre ?? "",
@@ -118,6 +143,14 @@
       disabled={cargandoItem || selectedId == null}
     >
       {cargandoItem ? "Cargando..." : "Cargar al Editor"}
+    </button>
+    <button
+      type="button"
+      class="action-button"
+      onclick={descargarAnalizadorObjetivo}
+      disabled={!$estadoDelAnalizador?.parserObjetivoFuente || $estadoDelAnalizador.parserObjetivoFuente.trim().length === 0}
+    >
+      Descargar Analizador
     </button>
   {/snippet}
 
